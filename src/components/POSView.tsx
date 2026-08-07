@@ -928,7 +928,7 @@ export default function POSView({
 
       {/* Cart & Billing details */}
       <div className="lg:col-span-4 flex flex-col gap-6">
-        <div className="bg-white border-4 border-black rounded-xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col justify-between overflow-hidden h-[500px] xl:h-[630px] lg:sticky lg:top-[170px]" id="pos-cart-panel">
+        <div className="bg-white border-4 border-black rounded-xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col justify-between overflow-hidden h-[500px] xl:h-[630px] lg:sticky lg:top-[200px]" id="pos-cart-panel">
           {/* Cart Header */}
           <div className="border-b-4 border-black px-5 py-4 bg-pink-300 flex items-center justify-between">
             <div className="flex items-center gap-2 text-black">

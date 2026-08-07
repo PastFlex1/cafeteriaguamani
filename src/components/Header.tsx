@@ -99,7 +99,7 @@ export default function Header({
   };
 
   return (
-    <header className="bg-cyan-300 border-b-4 border-black sticky top-0 z-40 px-6 py-4 shadow-[0_4px_0px_0px_rgba(0,0,0,1)]" id="app-header">
+    <header className="bg-cyan-300 border-b-4 border-black px-6 py-4" id="app-header">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
         {/* Logo and Business Info */}
         <div className="flex items-center gap-3.5">

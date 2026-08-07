@@ -1205,47 +1205,50 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col font-sans text-black selection:bg-yellow-300 selection:text-black" id="main-layout">
-      {/* 1. Dynamic Header controls */}
-      <Header 
-        businessName={businessName}
-        employees={employees}
-        activeEmployee={activeEmployee}
-        activeShift={activeShift}
-        shiftsHistory={shifts}
-        onSelectEmployee={handleSelectEmployee}
-        onStartShift={handleStartShift}
-        onEndShift={handleEndShift}
-      />
+      {/* Top Combined Sticky Header & Navigation */}
+      <div className="sticky top-0 z-40 w-full shadow-[0_4px_0px_0px_rgba(0,0,0,1)]">
+        {/* 1. Dynamic Header controls */}
+        <Header 
+          businessName={businessName}
+          employees={employees}
+          activeEmployee={activeEmployee}
+          activeShift={activeShift}
+          shiftsHistory={shifts}
+          onSelectEmployee={handleSelectEmployee}
+          onStartShift={handleStartShift}
+          onEndShift={handleEndShift}
+        />
 
-      {/* 2. Visual Navigation Tabs */}
-      <nav className="bg-yellow-300 border-b-4 border-black px-6 py-3 sticky top-[89px] z-30 shadow-[0_4px_0px_0px_rgba(0,0,0,1)]" id="sub-navigation">
-        <div className="max-w-7xl mx-auto flex gap-3 overflow-x-auto scrollbar-none py-1">
-          {[
-            { id: 'pos', name: '🎰 PUNTO DE VENTA', icon: Receipt },
-            { id: 'ventas', name: '🧾 REGISTRO DE VENTAS', icon: Receipt },
-            { id: 'inventario', name: '📦 INVENTARIO', icon: Package },
-            { id: 'analiticas', name: '📈 LEDGER & REPORTES', icon: TrendingUp },
-            { id: 'personal', name: '👥 PERSONAL & ARQUEOS', icon: Users },
-            { id: 'clientes', name: '👤 CLIENTES', icon: Users },
-          ].map((tab) => {
-            const isSelected = activeTab === tab.id;
-            
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-2 py-2.5 px-4 border-3 border-black rounded-lg text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
-                  isSelected 
-                    ? 'bg-pink-400 text-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] translate-x-[-2px] translate-y-[-2px]' 
-                    : 'bg-white text-black hover:bg-zinc-100 hover:translate-x-[-1px] hover:translate-y-[-1px] shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]'
-                }`}
-              >
-                <span>{tab.name}</span>
-              </button>
-            );
-          })}
-        </div>
-      </nav>
+        {/* 2. Visual Navigation Tabs */}
+        <nav className="bg-yellow-300 border-b-4 border-black px-6 py-3" id="sub-navigation">
+          <div className="max-w-7xl mx-auto flex gap-3 overflow-x-auto scrollbar-none py-1">
+            {[
+              { id: 'pos', name: '🎰 PUNTO DE VENTA', icon: Receipt },
+              { id: 'ventas', name: '🧾 REGISTRO DE VENTAS', icon: Receipt },
+              { id: 'inventario', name: '📦 INVENTARIO', icon: Package },
+              { id: 'analiticas', name: '📈 LEDGER & REPORTES', icon: TrendingUp },
+              { id: 'personal', name: '👥 PERSONAL & ARQUEOS', icon: Users },
+              { id: 'clientes', name: '👤 CLIENTES', icon: Users },
+            ].map((tab) => {
+              const isSelected = activeTab === tab.id;
+              
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`flex items-center gap-2 py-2.5 px-4 border-3 border-black rounded-lg text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
+                    isSelected 
+                      ? 'bg-pink-400 text-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] translate-x-[-2px] translate-y-[-2px]' 
+                      : 'bg-white text-black hover:bg-zinc-100 hover:translate-x-[-1px] hover:translate-y-[-1px] shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]'
+                  }`}
+                >
+                  <span>{tab.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+      </div>
 
       {/* 3. Main Work View Panels */}
       <main className="flex-1 px-6 py-8 max-w-7xl w-full mx-auto" id="app-workspace">
