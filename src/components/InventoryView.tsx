@@ -219,14 +219,9 @@ export default function InventoryView({
     }
     if (activeSubTab === 'inv_bebidas') {
       return (
-        item.category === 'cafes' ||
-        item.category === 'bebidas_frias' ||
-        item.category === 'cafe_caliente' ||
-        item.category === 'tes_infusiones' ||
-        item.category === 'bebidas_frias_frappes' ||
-        item.category === 'zumos_jugos' ||
-        item.category === 'bebidas_envasadas' ||
-        item.category === 'bebidas_alcoholicas'
+        item.category !== 'reposteria' &&
+        item.category !== 'alimentos' &&
+        item.category !== 'combos'
       );
     }
     if (activeSubTab === 'inv_combos') {
@@ -1329,17 +1324,20 @@ export default function InventoryView({
                                     <p className="font-black text-black text-sm uppercase">{item.name}</p>
                                     <span className="text-[10px] text-zinc-500 font-retro-mono font-bold uppercase">
                                       Categoría: {
-                                        item.category === 'cafe_caliente' ? 'Café Caliente y Tradicional' :
-                                        item.category === 'tes_infusiones' ? 'Tés e Infusiones' :
-                                        item.category === 'bebidas_frias_frappes' ? 'Bebidas Frías y Frappés' :
-                                        item.category === 'zumos_jugos' ? 'Zumos y Jugos Naturales' :
-                                        item.category === 'bebidas_envasadas' ? 'Bebidas envasadas' :
-                                        item.category === 'bebidas_alcoholicas' ? 'Bebidas alcohólicas' :
-                                        item.category === 'cafes' ? 'Café Caliente' :
-                                        item.category === 'bebidas_frias' ? 'Bebida / Alimento' :
-                                        item.category === 'reposteria' ? 'Pastelería' :
-                                        item.category === 'alimentos' ? 'Alimento' :
-                                        item.category === 'combos' ? 'Combo' : item.category
+                                        {
+                                          cafe_caliente: 'Café Caliente y Tradicional',
+                                          tes_infusiones: 'Tés e Infusiones',
+                                          bebidas_frias_frappes: 'Bebidas Frías y Frappés',
+                                          zumos_jugos: 'Zumos y Jugos Naturales',
+                                          bebidas_envasadas: 'Bebidas envasadas',
+                                          bebidas_alcoholicas: 'Bebidas alcohólicas',
+                                          gaseosas: 'Gaseosas',
+                                          cafes: 'Café Caliente',
+                                          bebidas_frias: 'Bebida / Alimento',
+                                          reposteria: 'Pastelería',
+                                          alimentos: 'Alimento',
+                                          combos: 'Combo'
+                                        }[item.category] || item.category
                                       }
                                     </span>
                                   </td>
