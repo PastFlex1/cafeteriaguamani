@@ -928,9 +928,9 @@ export default function POSView({
 
       {/* Cart & Billing details */}
       <div className="lg:col-span-4 flex flex-col gap-6">
-        <div className="bg-white border-4 border-black rounded-xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col justify-between overflow-hidden lg:sticky lg:top-[160px] h-[520px] max-h-[calc(100vh-175px)] xl:h-[650px]" id="pos-cart-panel">
+        <div className="bg-white border-4 border-black rounded-xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col justify-between overflow-hidden lg:sticky lg:top-[160px] h-[calc(100vh-185px)] min-h-[580px]" id="pos-cart-panel">
           {/* Cart Header */}
-          <div className="border-b-4 border-black px-5 py-4 bg-pink-300 flex items-center justify-between shrink-0">
+          <div className="border-b-4 border-black px-5 py-3.5 bg-pink-300 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2 text-black">
               <ShoppingCart className="w-5 h-5 stroke-[2.5]" />
               <span className="font-retro-heavy text-sm uppercase">ORDEN DE COBRO</span>
@@ -951,11 +951,11 @@ export default function POSView({
           {/* Cart Items List */}
           <div className="flex-1 overflow-y-auto px-3 py-2 bg-pink-50/20 space-y-2">
             {cart.map((cartItem) => (
-              <div key={cartItem.menuItem.id} className="p-3.5 bg-white border-2 border-black rounded-xl shadow-[2.5px_2.5px_0px_0px_rgba(0,0,0,1)] flex flex-col gap-2.5 text-black">
+              <div key={cartItem.menuItem.id} className="p-3 bg-white border-2 border-black rounded-xl shadow-[2.5px_2.5px_0px_0px_rgba(0,0,0,1)] flex flex-col gap-2 text-black">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <p className="text-xs sm:text-sm font-black uppercase tracking-wide break-words leading-tight">{cartItem.menuItem.name}</p>
-                    <p className="text-[11px] text-zinc-600 font-retro-mono mt-1 font-bold">
+                    <p className="text-[11px] text-zinc-600 font-retro-mono mt-0.5 font-bold">
                       ${formatNum(cartItem.menuItem.price)} c/u
                       {cartItem.discountPercent ? cartItem.discountPercent > 0 && (
                         <span className="ml-1.5 bg-rose-500 text-white px-1.5 py-0.5 rounded text-[9px] font-black uppercase">
@@ -980,7 +980,7 @@ export default function POSView({
                     </p>
                     <button
                       onClick={() => handleRemoveFromCart(cartItem.menuItem.id)}
-                      className="text-[9px] text-red-600 hover:text-red-800 font-black uppercase tracking-wider mt-1.5 cursor-pointer block"
+                      className="text-[9px] text-red-600 hover:text-red-800 font-black uppercase tracking-wider mt-1 cursor-pointer block"
                     >
                       QUITAR
                     </button>
@@ -988,7 +988,7 @@ export default function POSView({
                 </div>
 
                 {/* Adjust quantities & discount */}
-                <div className="flex items-center justify-between pt-2 border-t-2 border-dashed border-zinc-200 gap-2">
+                <div className="flex items-center justify-between pt-1.5 border-t-2 border-dashed border-zinc-200 gap-2">
                   <div className="flex items-center gap-1.5 bg-yellow-100 border-2 border-black rounded-lg p-0.5 shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)]">
                     <button
                       onClick={() => handleUpdateQuantity(cartItem.menuItem.id, -1)}
@@ -1043,7 +1043,7 @@ export default function POSView({
           </div>
 
           {/* Checkout Totals & Submit */}
-          <div className="border-t-4 border-black p-5 bg-cyan-200 space-y-4">
+          <div className="border-t-4 border-black p-4 bg-cyan-200 space-y-3 shrink-0">
             <div className="space-y-2 text-xs text-black font-bold">
               <div className="flex justify-between">
                 <span>Subtotal Neto:</span>
