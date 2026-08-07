@@ -641,12 +641,6 @@ export default function StaffView({
     doc.setFont('helvetica', 'bold');
     doc.text(`$${formatNum(cardSales)}`, 190, y + 29.5, { align: 'right' });
 
-    doc.setFont('helvetica', 'normal');
-    doc.text('Gastos de Barra (-):', 112, y + 35);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(180, 30, 30);
-    doc.text(`-$${formatNum(totalExpensesSum)}`, 190, y + 35, { align: 'right' });
-
     doc.setTextColor(0, 0, 0);
     y += 49;
 
@@ -664,7 +658,7 @@ export default function StaffView({
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(0, 0, 0);
 
-    const prefixText = `Ventas Netas: $${formatNum(totalSalesSum)}   |   Gastos: $${formatNum(totalExpensesSum)}   |   Resultado: `;
+    const prefixText = `Ventas Netas: $${formatNum(totalSalesSum)}   |   Resultado: `;
     doc.text(prefixText, 20, y + 11.5);
 
     const prefixWidth = doc.getTextWidth(prefixText);
@@ -1811,10 +1805,6 @@ export default function StaffView({
                         <span className="text-zinc-600">Ventas por Tarjeta (Soporte POS):</span>
                         <span className="font-retro-mono font-black text-zinc-700">${formatNum(pCardSales)}</span>
                       </div>
-                      <div className="flex justify-between items-center border-b border-black/10 pb-1.5 text-red-700">
-                        <span>Gastos Reportados en Barra (-):</span>
-                        <span className="font-retro-mono font-black">-${formatNum(pTotalExpensesSum)}</span>
-                      </div>
                       <div className="flex justify-between items-center pt-1">
                         <span className="text-black font-black uppercase text-[10px]">Diferencia de Transferencia:</span>
                         {previewShift.status === 'open' ? (
@@ -1850,7 +1840,7 @@ export default function StaffView({
                   <div>
                     <span className="font-retro-heavy text-[11px] uppercase tracking-wide text-zinc-700 block">Balance Consolidado General del Turno</span>
                     <span className="text-2xl font-retro-heavy mt-1 block">
-                      Ventas: ${formatNum(pTotalSalesSum)}  |  Gastos: ${formatNum(pTotalExpensesSum)}
+                      TOTAL VENTAS: ${formatNum(pTotalSalesSum)}
                     </span>
                   </div>
                   <div>
@@ -1957,32 +1947,6 @@ export default function StaffView({
                   </div>
                 </div>
 
-                {/* Extra expenses box if exist */}
-                {pShiftExpenses.length > 0 && (
-                  <div className="border-3 border-black rounded-lg overflow-hidden bg-white">
-                    <div className="bg-red-900 text-white p-2.5 font-retro-heavy text-[10px] uppercase tracking-wider">
-                      ⚠️ Gastos Extraordinarios Registrados ({pShiftExpenses.length})
-                    </div>
-                    <table className="w-full text-left text-[11px]">
-                      <thead>
-                        <tr className="bg-zinc-100 border-b border-black text-[9px] uppercase">
-                          <th className="py-1.5 px-3">Concepto / Descripción</th>
-                          <th className="py-1.5 px-3">Categoría</th>
-                          <th className="py-1.5 px-3 text-right">Gasto</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-200 font-retro-mono">
-                        {pShiftExpenses.map((exp) => (
-                          <tr key={exp.id} className="hover:bg-zinc-50">
-                            <td className="py-2 px-3 font-sans font-bold uppercase text-black">{exp.description}</td>
-                            <td className="py-2 px-3 font-sans uppercase text-zinc-600">{exp.category}</td>
-                            <td className="py-2 px-3 text-right font-black text-red-600">-${formatNum(exp.amount)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
               </div>
 
               {/* Footer Downloads */}
