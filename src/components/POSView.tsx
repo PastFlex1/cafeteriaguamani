@@ -1113,6 +1113,45 @@ export default function POSView({
                   <div className="flex items-center justify-between border-b-2 border-dashed border-zinc-200 pb-2 mb-1">
                     <span className="text-xs font-black uppercase tracking-wider text-fuchsia-600">👤 DATOS DEL CLIENTE</span>
                     <div className="flex gap-1.5">
+                      {!isConsumidorFinal && customerName.trim().length > 0 && customerDocumentId.trim().length > 0 && onSaveCustomer && (
+                        <button
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            const docVal = validarDocumentoEcuatoriano(customerDocumentId.trim());
+                            if (!docVal.valido) {
+                              alert(`Documento inválido: ${docVal.mensaje}`);
+                              return;
+                            }
+                            const customerToSave: CustomerDetails = {
+                              name: customerName.trim().toUpperCase(),
+                              documentId: customerDocumentId.trim(),
+                              phone: customerPhone.trim(),
+                              address: customerAddress.trim(),
+                              email: customerEmail.trim(),
+                            };
+                            const alreadyExists = customers.some(
+                              (c) => c.documentId.trim() === customerToSave.documentId
+                            );
+                            if (alreadyExists) {
+                              setRetroConfirm({
+                                message: `El cliente "${customerToSave.name}" ya está registrado. ¿Desea actualizar sus datos?`,
+                                onConfirm: () => {
+                                  onSaveCustomer!(customerToSave);
+                                  showRetroToast(`✅ Datos de "${customerToSave.name}" actualizados.`);
+                                },
+                              });
+                            } else {
+                              onSaveCustomer(customerToSave);
+                              showRetroToast(`✅ Cliente "${customerToSave.name}" guardado en el directorio.`);
+                            }
+                          }}
+                          className="bg-lime-300 hover:bg-lime-400 border-2 border-black rounded text-[9px] font-black px-2 py-0.5 cursor-pointer uppercase transition-all shadow-[1.5px_1.5px_0px_0px_#000] active:translate-y-0.5 text-black animate-bounce"
+                          title="Guardar este cliente en el directorio"
+                        >
+                          💾 Guardar
+                        </button>
+                      )}
                       <button
                         type="button"
                         onMouseDown={(e) => {

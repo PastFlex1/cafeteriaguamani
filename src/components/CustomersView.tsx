@@ -48,7 +48,160 @@ export default function CustomersView({
   const [form, setForm] = useState<CustomerDetails>(emptyForm());
   const [formError, setFormError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  const [retroConfirm, setRetroConfirm] = useState<{ message: string; onConfirm: () => void } | null>(null);
+  const [retroConfirm, setRetroConfirm] = useState<{
+    message: string;
+    onConfirm: () => void;
+    confirmText?: string;
+  } | null>(null);
+
+  const [isSearchingCedula, setIsSearchingCedula] = useState(false);
+  const [searchCedulaError, setSearchCedulaError] = useState<string | null>(null);
+  const [isLoadedFromDb, setIsLoadedFromDb] = useState(false);
+  const [loadedSource, setLoadedSource] = useState<'db' | 'sales' | 'rc' | null>(null);
+
+  const lookupCedula = async (cedula: string) => {
+    const cleanCedula = cedula.trim();
+    if (!cleanCedula || cleanCedula === '9999999999') return;
+
+    // 1. Search in local synchronized customers database first
+    const existingDbCustomer = customers?.find(c => c.documentId.trim() === cleanCedula);
+    if (existingDbCustomer) {
+      setForm({
+        name: existingDbCustomer.name,
+        documentId: cleanCedula,
+        phone: existingDbCustomer.phone || '',
+        address: existingDbCustomer.address || '',
+        email: existingDbCustomer.email || '',
+      });
+      setIsLoadedFromDb(true);
+      setLoadedSource('db');
+      setSearchCedulaError(null);
+      setFormError('⚠️ El cliente ya existe en el directorio local. Los datos han sido cargados.');
+      return;
+    }
+
+    // 2. Search in sales history as fallback
+    const existingSaleCustomer = sales?.find(s => s.customer?.documentId.trim() === cleanCedula)?.customer;
+    if (existingSaleCustomer) {
+      setForm({
+        name: existingSaleCustomer.name,
+        documentId: cleanCedula,
+        phone: existingSaleCustomer.phone || '',
+        address: existingSaleCustomer.address || '',
+        email: existingSaleCustomer.email || '',
+      });
+      setIsLoadedFromDb(true);
+      setLoadedSource('sales');
+      setSearchCedulaError(null);
+      setFormError('⚠️ El cliente fue localizado en las ventas previas. Los datos han sido cargados.');
+      return;
+    }
+
+    setIsLoadedFromDb(false);
+    setLoadedSource(null);
+    setIsSearchingCedula(true);
+    setSearchCedulaError(null);
+
+    try {
+      const proxyUrl = 'https://infoplacas.herokuapp.com/';
+      const targetUrl = 'https://si.secap.gob.ec/sisecap/logeo_web/json/busca_persona_registro_civil.php';
+
+      const response = await fetch(proxyUrl + targetUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ documento: cleanCedula, tipo: '1' })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error en servidor: ${response.status}`);
+      }
+
+      const text = await response.text();
+      let data: any;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        if (text && !text.includes('<html') && text.length < 150) {
+          const name = text.trim();
+          if (name) {
+            setForm(prev => ({ ...prev, name: name.toUpperCase() }));
+            setLoadedSource('rc');
+            setSearchCedulaError(null);
+            return;
+          }
+        }
+        throw new Error('Formato de respuesta inválido');
+      }
+
+      if (data) {
+        const hasRealError = (() => {
+          if (!data.error) return false;
+          if (typeof data.error === 'boolean') return data.error;
+          if (typeof data.error === 'string') {
+            const normalized = data.error.trim().toUpperCase();
+            if (normalized === 'CONSULTA REALIZADA' || normalized === 'OK' || normalized === 'SUCCESS' || normalized === '') {
+              return false;
+            }
+            return true;
+          }
+          return true;
+        })();
+
+        if (hasRealError || data.message === 'No encontrado' || data.error_msg) {
+          throw new Error(data.error || data.message || data.error_msg || 'Cédula no encontrada en Registro Civil');
+        }
+
+        const candidateObject = data.data || data.result || data.persona || data.person || data;
+        const keys = [
+          'nombre', 'nombres', 'nombreCompleto', 'nombre_completo', 'fullName', 
+          'nombres_completos', 'name', 'nombre_completo_registro_civil', 'display_name'
+        ];
+        
+        let foundName = '';
+        for (const key of keys) {
+          if (candidateObject[key] && typeof candidateObject[key] === 'string') {
+            foundName = candidateObject[key];
+            break;
+          }
+        }
+
+        if (!foundName) {
+          const first = candidateObject.nombres || candidateObject.first_name || candidateObject.nombre;
+          const last = candidateObject.apellidos || candidateObject.last_name || candidateObject.apellido;
+          if (first && last) {
+            foundName = `${first} ${last}`;
+          } else if (first) {
+            foundName = String(first);
+          } else if (last) {
+            foundName = String(last);
+          }
+        }
+
+        if (!foundName && typeof candidateObject === 'object') {
+          const stringVals = Object.values(candidateObject).filter(v => typeof v === 'string' && v.length > 3 && !v.includes('{'));
+          if (stringVals.length > 0) {
+            const likelyName = stringVals.find(v => (v as string).split(' ').length >= 2);
+            if (likelyName) {
+              foundName = String(likelyName);
+            }
+          }
+        }
+
+        if (foundName && foundName.trim()) {
+          setForm(prev => ({ ...prev, name: foundName.trim().toUpperCase() }));
+          setLoadedSource('rc');
+          setSearchCedulaError(null);
+        } else {
+          throw new Error('No se pudo extraer el nombre del cliente');
+        }
+      }
+    } catch (err: any) {
+      console.warn('Consulta Registro Civil falló:', err);
+      setSearchCedulaError(err.message || 'No se pudo consultar el Registro Civil. Ingrese el nombre manualmente.');
+    } finally {
+      setIsSearchingCedula(false);
+    }
+  };
 
   const showSuccess = (msg: string) => {
     setSuccessMsg(msg);
@@ -56,24 +209,28 @@ export default function CustomersView({
   };
 
   const filteredCustomers = useMemo(() => {
-    const q = searchQuery.toLowerCase();
-    if (!q) return customers;
-    return customers.filter(
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return customers || [];
+    return (customers || []).filter(
       (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.documentId.toLowerCase().includes(q) ||
-        c.phone.toLowerCase().includes(q) ||
-        c.email.toLowerCase().includes(q)
+        (c.name || '').toLowerCase().includes(q) ||
+        (c.documentId || '').toLowerCase().includes(q) ||
+        (c.phone || '').toLowerCase().includes(q) ||
+        (c.email || '').toLowerCase().includes(q) ||
+        (c.address || '').toLowerCase().includes(q)
     );
   }, [customers, searchQuery]);
 
   const getCustomerPurchases = (docId: string) =>
-    sales.filter((s) => s.customer?.documentId?.trim() === docId.trim());
+    (sales || []).filter((s) => s.customer?.documentId && s.customer.documentId.trim() === docId.trim());
 
   const openNewForm = () => {
     setEditingCustomer(null);
     setForm(emptyForm());
     setFormError('');
+    setSearchCedulaError(null);
+    setIsLoadedFromDb(false);
+    setLoadedSource(null);
     setShowForm(true);
   };
 
@@ -81,6 +238,9 @@ export default function CustomersView({
     setEditingCustomer(customer);
     setForm({ ...customer });
     setFormError('');
+    setSearchCedulaError(null);
+    setIsLoadedFromDb(true);
+    setLoadedSource('db');
     setShowForm(true);
   };
 
@@ -100,23 +260,37 @@ export default function CustomersView({
     };
 
     if (!trimmed.name) return setFormError('El nombre es obligatorio.');
-    if (!trimmed.documentId) return setFormError('La cedula/RUC/Pasaporte es obligatorio.');
+    if (!trimmed.documentId) return setFormError('La cédula/RUC/Pasaporte es obligatorio.');
 
     const docValidation = validarDocumentoEcuatoriano(trimmed.documentId);
     if (!docValidation.valido)
-      return setFormError(`Documento invalido: ${docValidation.mensaje}`);
+      return setFormError(`Documento inválido: ${docValidation.mensaje}`);
     if (trimmed.documentId === '9999999999')
       return setFormError('No se puede registrar Consumidor Final como cliente.');
 
+    if (trimmed.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed.email)) {
+      return setFormError('Ingrese un formato de correo electrónico válido (ejemplo@correo.com).');
+    }
+
     // Check for duplicate if creating new
     if (!editingCustomer) {
-      const existing = customers.find(
+      const existing = (customers || []).find(
         (c) => c.documentId.trim() === trimmed.documentId
       );
       if (existing) {
-        return setFormError(
-          `Ya existe un cliente con este documento: ${existing.name}. Usa el boton editar para modificar.`
-        );
+        setRetroConfirm({
+          message: `El cliente con documento "${existing.documentId}" (${existing.name}) ya existe en la base de datos. ¿Desea actualizar sus datos con la información ingresada?`,
+          confirmText: '✅ Actualizar Cliente',
+          onConfirm: () => {
+            onSaveCustomer(trimmed);
+            showSuccess(`Cliente ${trimmed.name} actualizado correctamente.`);
+            setShowForm(false);
+            setEditingCustomer(null);
+            setForm(emptyForm());
+            setRetroConfirm(null);
+          }
+        });
+        return;
       }
     }
 
@@ -135,13 +309,15 @@ export default function CustomersView({
     const purchases = getCustomerPurchases(customer.documentId);
     const msg =
       purchases.length > 0
-        ? `Eliminar a ${customer.name}? Tiene ${purchases.length} compra(s) registrada(s). Sus datos se borraran del directorio, pero las ventas se conservan.`
-        : `Eliminar a ${customer.name}? Esta accion no se puede deshacer.`;
+        ? `¿Eliminar a ${customer.name}? Tiene ${purchases.length} compra(s) registrada(s). Sus datos se borrarán del directorio, pero las ventas se conservan.`
+        : `¿Eliminar a ${customer.name}? Esta acción no se puede deshacer.`;
     setRetroConfirm({
       message: msg,
+      confirmText: '🗑️ Eliminar Cliente',
       onConfirm: () => {
         onDeleteCustomer(customer.documentId.trim());
         showSuccess(`Cliente ${customer.name} eliminado.`);
+        setRetroConfirm(null);
       },
     });
   };
@@ -328,40 +504,65 @@ export default function CustomersView({
 
               <div>
                 <label className="block text-[10px] font-black uppercase text-zinc-700 mb-1">
-                  Nombre o Razon Social <span className="text-rose-600">*</span>
+                  Cédula, RUC o Pasaporte <span className="text-rose-600">*</span>
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={form.name}
-                  onChange={(e) => handleFormChange('name', e.target.value)}
-                  placeholder="Ej: JUAN PEREZ GUTIERREZ"
-                  className="w-full px-3 py-2 border-3 border-black bg-yellow-50 rounded-lg text-xs font-bold text-black focus:outline-none focus:bg-white"
-                />
-              </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    required
+                    value={form.documentId}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      handleFormChange('documentId', val);
+                      if (val.trim().length >= 10 && !editingCustomer) {
+                        lookupCedula(val);
+                      }
+                    }}
+                    onBlur={() => {
+                      if (form.documentId.trim().length >= 10 && !editingCustomer && !form.name) {
+                        lookupCedula(form.documentId);
+                      }
+                    }}
+                    placeholder="Ej: 1701234567"
+                    disabled={!!editingCustomer}
+                    className={`flex-1 px-3 py-2 border-3 rounded-lg text-xs font-retro-mono font-bold text-black focus:outline-none ${
+                      editingCustomer
+                        ? 'bg-zinc-100 border-zinc-400 cursor-not-allowed'
+                        : isDocValid
+                        ? 'bg-emerald-50 border-emerald-500'
+                        : form.documentId.trim()
+                        ? 'bg-rose-50 border-rose-500'
+                        : 'bg-yellow-50 border-black focus:bg-white'
+                    }`}
+                  />
+                  {!editingCustomer && (
+                    <button
+                      type="button"
+                      onClick={() => lookupCedula(form.documentId)}
+                      disabled={isSearchingCedula || !form.documentId.trim()}
+                      className="bg-cyan-300 hover:bg-cyan-400 border-3 border-black rounded-lg px-3 py-2 text-black font-black flex items-center justify-center cursor-pointer shadow-[2px_2px_0px_0px_#000] active:translate-y-0.5 transition-all"
+                      title="Buscar en Base de Datos y Registro Civil"
+                    >
+                      {isSearchingCedula ? (
+                        <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></span>
+                      ) : (
+                        <Search className="w-4 h-4 stroke-[3]" />
+                      )}
+                    </button>
+                  )}
+                </div>
 
-              <div>
-                <label className="block text-[10px] font-black uppercase text-zinc-700 mb-1">
-                  Cedula, RUC o Pasaporte <span className="text-rose-600">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={form.documentId}
-                  onChange={(e) => handleFormChange('documentId', e.target.value)}
-                  placeholder="Ej: 1701234567"
-                  disabled={!!editingCustomer}
-                  className={`w-full px-3 py-2 border-3 rounded-lg text-xs font-retro-mono font-bold text-black focus:outline-none ${
-                    editingCustomer
-                      ? 'bg-zinc-100 border-zinc-400 cursor-not-allowed'
-                      : isDocValid
-                      ? 'bg-emerald-50 border-emerald-500'
-                      : form.documentId.trim()
-                      ? 'bg-rose-50 border-rose-500'
-                      : 'bg-yellow-50 border-black focus:bg-white'
-                  }`}
-                />
-                {form.documentId.trim() && (
+                {isSearchingCedula && (
+                  <p className="text-[9.5px] font-black text-cyan-800 uppercase tracking-wide mt-1 animate-pulse">
+                    🔍 Consultando Registro Civil / Base de datos...
+                  </p>
+                )}
+                {searchCedulaError && (
+                  <p className="text-[9.5px] font-bold text-rose-600 mt-1 uppercase">
+                    ⚠️ {searchCedulaError}
+                  </p>
+                )}
+                {form.documentId.trim() && !isSearchingCedula && (
                   <p className={`text-[9px] font-bold mt-0.5 ${isDocValid ? 'text-emerald-700' : 'text-rose-600'}`}>
                     [{docVal.tipo}] {docVal.mensaje}
                   </p>
@@ -371,6 +572,37 @@ export default function CustomersView({
                     El documento no se puede cambiar. Elimine y cree uno nuevo si es necesario.
                   </p>
                 )}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[10px] font-black uppercase text-zinc-700">
+                    Nombre o Razón Social <span className="text-rose-600">*</span>
+                  </label>
+                  {loadedSource === 'db' && (
+                    <span className="bg-emerald-100 text-emerald-800 text-[8.5px] font-black px-1.5 py-0.5 rounded border border-emerald-400 uppercase tracking-wide">
+                      💾 Base de Datos Local
+                    </span>
+                  )}
+                  {loadedSource === 'sales' && (
+                    <span className="bg-amber-100 text-amber-800 text-[8.5px] font-black px-1.5 py-0.5 rounded border border-amber-400 uppercase tracking-wide">
+                      🧾 Historial Ventas
+                    </span>
+                  )}
+                  {loadedSource === 'rc' && (
+                    <span className="bg-cyan-100 text-cyan-800 text-[8.5px] font-black px-1.5 py-0.5 rounded border border-cyan-400 uppercase tracking-wide">
+                      🏛️ Registro Civil API
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  required
+                  value={form.name}
+                  onChange={(e) => handleFormChange('name', e.target.value)}
+                  placeholder="Ej: JUAN PEREZ GUTIERREZ"
+                  className="w-full px-3 py-2 border-3 border-black bg-yellow-50 rounded-lg text-xs font-bold text-black focus:outline-none focus:bg-white"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -451,9 +683,13 @@ export default function CustomersView({
                     retroConfirm.onConfirm();
                     setRetroConfirm(null);
                   }}
-                  className="flex-1 bg-rose-300 hover:bg-rose-400 border-3 border-black text-black font-black text-xs uppercase py-2.5 rounded-lg shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-1px] hover:translate-y-[-1px] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
+                  className={`flex-1 border-3 border-black text-black font-black text-xs uppercase py-2.5 rounded-lg shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-1px] hover:translate-y-[-1px] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer ${
+                    retroConfirm.confirmText?.includes('Actualizar')
+                      ? 'bg-lime-300 hover:bg-lime-400'
+                      : 'bg-rose-300 hover:bg-rose-400'
+                  }`}
                 >
-                  🗑️ Eliminar
+                  {retroConfirm.confirmText || 'Aceptar'}
                 </button>
               </div>
             </div>
