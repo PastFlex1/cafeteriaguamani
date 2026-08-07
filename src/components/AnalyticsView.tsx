@@ -126,8 +126,8 @@ export default function AnalyticsView({
   // Total revenue is sales + net shift surpluses
   const totalRevenue = totalSalesRevenue + totalDiscrepanciesGains;
 
-  // Total expenses include insumos, manual expenses, and net shift shortages
-  const totalExpensesCombined = totalInsumosCost + totalOperationalExpenses + totalDiscrepanciesLosses;
+  // Total expenses include manual operational expenses and net shift shortages (avoiding double-counting with recipe costs)
+  const totalExpensesCombined = totalOperationalExpenses + totalDiscrepanciesLosses;
   
   // Net profit is total revenues minus total expenses
   const netProfit = totalRevenue - totalExpensesCombined;
@@ -225,7 +225,6 @@ export default function AnalyticsView({
       const trendKey = getTrendKey(sale.timestamp);
       if (trend[trendKey]) {
         trend[trendKey].total += sale.total;
-        trend[trendKey].cost += sale.cost;
       }
     });
 
@@ -518,7 +517,7 @@ export default function AnalyticsView({
     doc.setFontSize(7.5);
     doc.setTextColor(100, 100, 100);
     doc.text('INGRESOS NETOS', 18, y + 6);
-    doc.text('EGRESOS COMBINADOS', 78, y + 6);
+    doc.text('EGRESOS TOTALES', 78, y + 6);
     doc.text('UTILIDAD NETA', 138, y + 6);
     
     doc.setFontSize(12.5);
@@ -538,7 +537,7 @@ export default function AnalyticsView({
     doc.setFontSize(7);
     doc.setTextColor(120, 120, 120);
     doc.text(`${totalTransactions} transacciones${totalDiscrepanciesGains > 0 ? ` | Sobrante: $${formatNum(totalDiscrepanciesGains, 1)}` : ''}`, 18, y + 19);
-    doc.text(`Costo: $${formatNum(totalInsumosCost, 1)} | Op: $${formatNum(totalOperationalExpenses, 1)}${totalDiscrepanciesLosses > 0 ? ` | Faltante: $${formatNum(totalDiscrepanciesLosses, 1)}` : ''}`, 78, y + 19);
+    doc.text(`Gastos Op: $${formatNum(totalOperationalExpenses, 1)} | Receta: $${formatNum(totalInsumosCost, 1)}${totalDiscrepanciesLosses > 0 ? ` | Faltante: $${formatNum(totalDiscrepanciesLosses, 1)}` : ''}`, 78, y + 19);
     doc.text('Ingresos menos Egresos', 138, y + 19);
     
     y += 26;
@@ -862,7 +861,7 @@ export default function AnalyticsView({
         {/* Expenses */}
         <div className="bg-[#fecdd3] border-3 border-black rounded-xl p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] uppercase tracking-widest text-black font-black font-retro-mono">EGRESOS COMB.</span>
+            <span className="text-[10px] uppercase tracking-widest text-black font-black font-retro-mono">EGRESOS TOTALES</span>
             <div className="w-8 h-8 rounded border-2 border-black bg-white text-black flex items-center justify-center">
               <ArrowDownRight className="w-4 h-4 stroke-[2.5]" />
             </div>
@@ -870,7 +869,7 @@ export default function AnalyticsView({
           <div className="mt-4">
             <h3 className="text-2xl font-retro-heavy text-black">${formatNum(totalExpensesCombined)}</h3>
             <p className="text-[10px] font-bold text-zinc-700 uppercase mt-1">
-              Costos: ${formatNum(totalInsumosCost, 1)} | Op: ${formatNum(totalOperationalExpenses, 1)}
+              Gastos Op: ${formatNum(totalOperationalExpenses, 1)} | Receta: ${formatNum(totalInsumosCost, 1)}
               {totalDiscrepanciesLosses > 0 && ` | Faltante: $${formatNum(totalDiscrepanciesLosses, 1)}`}
             </p>
           </div>
