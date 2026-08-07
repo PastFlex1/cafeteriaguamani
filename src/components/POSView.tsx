@@ -1321,12 +1321,17 @@ export default function POSView({
                 </div>
 
                 {/* SAVE CUSTOMER BUTTON */}
-                {!isConsumidorFinal && isCustomerDataValid && onSaveCustomer && (
+                {!isConsumidorFinal && customerName.trim().length > 0 && customerDocumentId.trim().length > 0 && onSaveCustomer && (
                   <div className="flex justify-end">
                     <button
                       type="button"
                       onMouseDown={(e) => {
                         e.preventDefault();
+                        const docVal = validarDocumentoEcuatoriano(customerDocumentId.trim());
+                        if (!docVal.valido) {
+                          alert(`Documento inválido: ${docVal.mensaje}`);
+                          return;
+                        }
                         const customerToSave: CustomerDetails = {
                           name: customerName.trim().toUpperCase(),
                           documentId: customerDocumentId.trim(),
@@ -1350,9 +1355,9 @@ export default function POSView({
                           showRetroToast(`✅ Cliente "${customerToSave.name}" guardado en el directorio.`);
                         }
                       }}
-                      className="flex items-center gap-1.5 bg-lime-200 hover:bg-lime-300 border-2 border-black text-black font-black text-[10px] uppercase px-3 py-1.5 rounded shadow-[2px_2px_0px_0px_#000] active:translate-y-0.5 transition-all cursor-pointer"
+                      className="flex items-center gap-1.5 bg-lime-200 hover:bg-lime-300 border-2 border-black text-black font-black text-[10px] uppercase px-3.5 py-2 rounded-lg shadow-[2px_2px_0px_0px_#000] active:translate-y-0.5 transition-all cursor-pointer"
                     >
-                      💾 GUARDAR CLIENTE
+                      💾 GUARDAR CLIENTE EN DIRECTORIO
                     </button>
                   </div>
                 )}
