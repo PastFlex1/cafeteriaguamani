@@ -928,9 +928,9 @@ export default function POSView({
 
       {/* Cart & Billing details */}
       <div className="lg:col-span-4 flex flex-col gap-6">
-        <div className="bg-white border-4 border-black rounded-xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col justify-between overflow-hidden h-[500px] xl:h-[630px] lg:sticky lg:top-[200px]" id="pos-cart-panel">
+        <div className="bg-white border-4 border-black rounded-xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col justify-between overflow-hidden lg:sticky lg:top-[160px] h-[520px] max-h-[calc(100vh-175px)] xl:h-[650px]" id="pos-cart-panel">
           {/* Cart Header */}
-          <div className="border-b-4 border-black px-5 py-4 bg-pink-300 flex items-center justify-between">
+          <div className="border-b-4 border-black px-5 py-4 bg-pink-300 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2 text-black">
               <ShoppingCart className="w-5 h-5 stroke-[2.5]" />
               <span className="font-retro-heavy text-sm uppercase">ORDEN DE COBRO</span>
@@ -941,7 +941,7 @@ export default function POSView({
             {cart.length > 0 && (
               <button
                 onClick={handleClearCart}
-                className="bg-red-400 hover:bg-red-500 border-2 border-black text-black px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-[2px_2px_0px_0px_#000] active:translate-y-0.5"
+                className="bg-red-400 hover:bg-red-500 border-2 border-black text-black px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-[2px_2px_0px_0px_#000] active:translate-y-0.5"
               >
                 LIMPIAR
               </button>
@@ -949,43 +949,24 @@ export default function POSView({
           </div>
 
           {/* Cart Items List */}
-          <div className="flex-1 overflow-y-auto divide-y-2 divide-dashed divide-black/20 px-4 bg-yellow-50/30">
+          <div className="flex-1 overflow-y-auto px-3 py-2 bg-pink-50/20 space-y-2">
             {cart.map((cartItem) => (
-              <div key={cartItem.menuItem.id} className="py-4 flex flex-col gap-2 font-bold text-black border-b border-zinc-200">
-                <div className="flex items-center justify-between gap-3">
+              <div key={cartItem.menuItem.id} className="p-3.5 bg-white border-2 border-black rounded-xl shadow-[2.5px_2.5px_0px_0px_rgba(0,0,0,1)] flex flex-col gap-2.5 text-black">
+                <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-black uppercase tracking-wide break-words whitespace-normal">{cartItem.menuItem.name}</p>
-                    <p className="text-xs text-zinc-600 font-retro-mono mt-1 font-bold">
+                    <p className="text-xs sm:text-sm font-black uppercase tracking-wide break-words leading-tight">{cartItem.menuItem.name}</p>
+                    <p className="text-[11px] text-zinc-600 font-retro-mono mt-1 font-bold">
                       ${formatNum(cartItem.menuItem.price)} c/u
                       {cartItem.discountPercent ? cartItem.discountPercent > 0 && (
-                        <span className="ml-1.5 bg-rose-500 text-white px-1 py-0.5 rounded text-[9px] font-black uppercase tracking-wider">
+                        <span className="ml-1.5 bg-rose-500 text-white px-1.5 py-0.5 rounded text-[9px] font-black uppercase">
                           -{cartItem.discountPercent}% desc
                         </span>
                       ) : null}
                     </p>
                   </div>
 
-                  {/* Adjust quantities */}
-                  <div className="flex items-center gap-1 bg-white border-2 border-black rounded-md p-0.5 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-                    <button
-                      onClick={() => handleUpdateQuantity(cartItem.menuItem.id, -1)}
-                      className="p-1 hover:bg-red-100 rounded text-black font-black cursor-pointer"
-                    >
-                      <Minus className="w-3.5 h-3.5 stroke-[3]" />
-                    </button>
-                    <span className="font-retro-mono text-xs font-black w-6 text-center">
-                      {cartItem.quantity}
-                    </span>
-                    <button
-                      onClick={() => handleUpdateQuantity(cartItem.menuItem.id, 1)}
-                      className="p-1 hover:bg-lime-100 rounded text-black font-black cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                    </button>
-                  </div>
-
-                  <div className="text-right pl-1">
-                    <p className="text-xs font-retro-mono font-black bg-black text-yellow-300 px-1.5 py-0.5 rounded">
+                  <div className="text-right flex flex-col items-end shrink-0">
+                    <p className="text-xs font-retro-mono font-black bg-black text-yellow-300 px-2 py-0.5 rounded shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]">
                       {cartItem.discountPercent && cartItem.discountPercent > 0 ? (
                         <span>
                           <span className="line-through text-zinc-400 text-[10px] mr-1">
@@ -999,19 +980,35 @@ export default function POSView({
                     </p>
                     <button
                       onClick={() => handleRemoveFromCart(cartItem.menuItem.id)}
-                      className="text-[9px] text-red-600 hover:underline mt-1 cursor-pointer font-black uppercase tracking-wider block ml-auto"
+                      className="text-[9px] text-red-600 hover:text-red-800 font-black uppercase tracking-wider mt-1.5 cursor-pointer block"
                     >
-                      Quitar
+                      QUITAR
                     </button>
                   </div>
                 </div>
 
-                {/* Individual discount input percentage */}
-                <div className="flex items-center justify-between bg-zinc-100/90 border-2 border-black border-dashed px-2.5 py-1.5 rounded-md text-[11px] mt-0.5">
-                  <span className="text-zinc-700 font-black uppercase text-[9.5px] flex items-center gap-1">
-                    🏷️ Descuento del producto:
-                  </span>
-                  <div className="flex items-center gap-1 w-20">
+                {/* Adjust quantities & discount */}
+                <div className="flex items-center justify-between pt-2 border-t-2 border-dashed border-zinc-200 gap-2">
+                  <div className="flex items-center gap-1.5 bg-yellow-100 border-2 border-black rounded-lg p-0.5 shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)]">
+                    <button
+                      onClick={() => handleUpdateQuantity(cartItem.menuItem.id, -1)}
+                      className="p-1 hover:bg-red-200 rounded text-black font-black cursor-pointer transition-colors"
+                    >
+                      <Minus className="w-3 h-3 stroke-[3]" />
+                    </button>
+                    <span className="font-retro-mono text-xs font-black w-6 text-center">
+                      {cartItem.quantity}
+                    </span>
+                    <button
+                      onClick={() => handleUpdateQuantity(cartItem.menuItem.id, 1)}
+                      className="p-1 hover:bg-lime-200 rounded text-black font-black cursor-pointer transition-colors"
+                    >
+                      <Plus className="w-3 h-3 stroke-[3]" />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-1 bg-zinc-50 border-2 border-black border-dashed px-2 py-0.5 rounded-lg text-[10px]">
+                    <span className="text-zinc-600 font-black uppercase text-[9px]">Desc:</span>
                     <input
                       type="number"
                       step="any"
@@ -1026,7 +1023,7 @@ export default function POSView({
                           handleUpdateItemDiscount(cartItem.menuItem.id, val === '' ? 0 : parsed);
                         }
                       }}
-                      className="w-full text-right px-1.5 py-0.5 border border-black bg-yellow-50 rounded text-xs font-retro-mono font-bold text-black focus:outline-none focus:bg-pink-50"
+                      className="w-10 text-right bg-yellow-50 px-1 py-0.5 border border-black rounded text-xs font-retro-mono font-bold text-black focus:outline-none focus:bg-pink-100"
                     />
                     <span className="font-black">%</span>
                   </div>
@@ -1035,10 +1032,10 @@ export default function POSView({
             ))}
 
             {cart.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-full py-20 text-center text-zinc-500 font-bold">
-                <ShoppingCart className="w-14 h-14 stroke-[1.5] text-black mb-3 animate-pulse" />
-                <p className="font-retro-heavy text-sm uppercase">CARRITO VACÍO</p>
-                <p className="text-xs text-zinc-600 px-6 mt-2 leading-relaxed">
+              <div className="flex flex-col items-center justify-center h-full py-16 text-center text-zinc-500 font-bold">
+                <ShoppingCart className="w-12 h-12 stroke-[1.5] text-black mb-3 animate-pulse" />
+                <p className="font-retro-heavy text-sm uppercase text-black">CARRITO VACÍO</p>
+                <p className="text-xs text-zinc-600 px-6 mt-2 leading-relaxed font-sans font-semibold">
                   Haz click en las tarjetas de productos para cargar el ticket de compra.
                 </p>
               </div>
