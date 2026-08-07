@@ -183,7 +183,7 @@ export default function App() {
         const name = docSnap.data().name || 'moccapricho';
         if (name === 'Café Aromas') {
           // Auto upgrade old Cafe Aromas default to moccapricho
-          setDoc(doc(db, "config", "business"), { name: "moccapricho" }).catch(err => {
+          setDoc(doc(db, "config", "business"), { id: "business", name: "moccapricho" }).catch(err => {
             console.error("Error upgrading business name in DB:", err);
           });
           setBusinessName('moccapricho');
@@ -193,7 +193,7 @@ export default function App() {
           localStorage.setItem('caf_business_name', name);
         }
       } else {
-        setDoc(doc(db, "config", "business"), { name: "moccapricho" }).catch(err => {
+        setDoc(doc(db, "config", "business"), { id: "business", name: "moccapricho" }).catch(err => {
           console.error("Error setting business name in DB:", err);
         });
       }
@@ -237,13 +237,13 @@ export default function App() {
           });
 
           // Mark as seeded so we don't re-run this upon empty DB or clear action
-          batch.set(doc(db, "config", "system"), { seeded: true });
+          batch.set(doc(db, "config", "system"), { id: "system", seeded: true });
 
           await batch.commit();
           console.log("¡Sembrado completado exitosamente!");
         } else {
           // System already has some data, so mark it as seeded
-          await setDoc(doc(db, "config", "system"), { seeded: true });
+          await setDoc(doc(db, "config", "system"), { id: "system", seeded: true });
         }
       } catch (error) {
         const errMsg = error instanceof Error ? error.message : String(error);
@@ -1130,7 +1130,7 @@ export default function App() {
         batch.delete(doc(db, "shifts", sh.id));
       });
 
-      batch.set(doc(db, "config", "system"), { seeded: true }, { merge: true });
+      batch.set(doc(db, "config", "system"), { id: "system", seeded: true }, { merge: true });
       await batch.commit();
 
       setSales([]);

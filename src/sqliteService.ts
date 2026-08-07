@@ -49,9 +49,10 @@ class SqliteService {
   }
 
   async setDoc(collectionName: string, id: string, data: any): Promise<void> {
+    const itemData = (data && typeof data === 'object') ? { id, ...data } : data;
     if (this.isElectron && window.sqliteApi) {
       try {
-        await window.sqliteApi.setDoc(collectionName, id, data);
+        await window.sqliteApi.setDoc(collectionName, id, itemData);
       } catch (err) {
         console.error(`Error guardando doc ${collectionName}/${id} en SQLite:`, err);
       }
@@ -59,9 +60,9 @@ class SqliteService {
       const items = await this.getAll(collectionName);
       const idx = items.findIndex(item => item.id === id);
       if (idx > -1) {
-        items[idx] = data;
+        items[idx] = itemData;
       } else {
-        items.push(data);
+        items.push(itemData);
       }
       localStorage.setItem(this.getStorageKey(collectionName), JSON.stringify(items));
     }
@@ -82,16 +83,23 @@ class SqliteService {
   }
 
   async writeBatch(ops: { type: 'set' | 'delete'; collection: string; id: string; data?: any }[]): Promise<void> {
+    const formattedOps = ops.map(op => {
+      if (op.type === 'set' && op.data && typeof op.data === 'object') {
+        return { ...op, data: { id: op.id, ...op.data } };
+      }
+      return op;
+    });
+
     if (this.isElectron && window.sqliteApi) {
       try {
-        await window.sqliteApi.writeBatch(ops);
+        await window.sqliteApi.writeBatch(formattedOps);
       } catch (err) {
         console.error('Error ejecutando batch en SQLite:', err);
       }
     } else {
       const collectionsMap = new Map<string, any[]>();
 
-      for (const op of ops) {
+      for (const op of formattedOps) {
         if (!collectionsMap.has(op.collection)) {
           collectionsMap.set(op.collection, await this.getAll(op.collection));
         }
