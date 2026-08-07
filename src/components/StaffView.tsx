@@ -520,7 +520,8 @@ export default function StaffView({
       const startTime = new Date(shift.startTime).getTime();
       const isAfterStart = expTime >= startTime;
       const isBeforeEnd = shift.endTime ? expTime <= new Date(shift.endTime).getTime() : true;
-      return isAfterStart && isBeforeEnd;
+      const isShiftCashExpense = e.category !== 'renta' && e.category !== 'servicios';
+      return isAfterStart && isBeforeEnd && isShiftCashExpense;
     });
 
     // Cálculos monetarios
@@ -1656,7 +1657,8 @@ export default function StaffView({
           const startTime = new Date(previewShift.startTime).getTime();
           const isAfterStart = expTime >= startTime;
           const isBeforeEnd = previewShift.endTime ? expTime <= new Date(previewShift.endTime).getTime() : true;
-          return isAfterStart && isBeforeEnd;
+          const isShiftCashExpense = e.category !== 'renta' && e.category !== 'servicios';
+          return isAfterStart && isBeforeEnd && isShiftCashExpense;
         });
 
         const pCashSales = pShiftSales.filter(s => s.paymentMethod === 'efectivo').reduce((sum, s) => sum + s.total, 0);
