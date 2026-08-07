@@ -44,7 +44,7 @@ class SqliteService {
       }
     } else {
       const items = await this.getAll(collectionName);
-      return items.find(item => item.id === id) || null;
+      return items.find(item => item.id === id || (item.documentId && item.documentId.trim() === id)) || null;
     }
   }
 
@@ -58,7 +58,7 @@ class SqliteService {
       }
     } else {
       const items = await this.getAll(collectionName);
-      const idx = items.findIndex(item => item.id === id);
+      const idx = items.findIndex(item => item.id === id || (item.documentId && item.documentId.trim() === id));
       if (idx > -1) {
         items[idx] = itemData;
       } else {
@@ -77,7 +77,7 @@ class SqliteService {
       }
     } else {
       let items = await this.getAll(collectionName);
-      items = items.filter(item => item.id !== id);
+      items = items.filter(item => item.id !== id && item.documentId !== id);
       localStorage.setItem(this.getStorageKey(collectionName), JSON.stringify(items));
     }
   }
@@ -106,14 +106,14 @@ class SqliteService {
         const items = collectionsMap.get(op.collection)!;
 
         if (op.type === 'set') {
-          const idx = items.findIndex(item => item.id === op.id);
+          const idx = items.findIndex(item => item.id === op.id || (item.documentId && item.documentId.trim() === op.id));
           if (idx > -1) {
             items[idx] = op.data;
           } else {
             items.push(op.data);
           }
         } else if (op.type === 'delete') {
-          const nextItems = items.filter(item => item.id !== op.id);
+          const nextItems = items.filter(item => item.id !== op.id && item.documentId !== op.id);
           collectionsMap.set(op.collection, nextItems);
         }
       }

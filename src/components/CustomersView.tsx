@@ -209,9 +209,19 @@ export default function CustomersView({
   };
 
   const filteredCustomers = useMemo(() => {
+    const rawList = customers || [];
+    const uniqueMap = new Map<string, CustomerDetails>();
+    for (const c of rawList) {
+      if (!c) continue;
+      const key = (c.documentId || '').trim();
+      if (key) {
+        uniqueMap.set(key, c);
+      }
+    }
+    const uniqueList = Array.from(uniqueMap.values());
     const q = searchQuery.toLowerCase().trim();
-    if (!q) return customers || [];
-    return (customers || []).filter(
+    if (!q) return uniqueList;
+    return uniqueList.filter(
       (c) =>
         (c.name || '').toLowerCase().includes(q) ||
         (c.documentId || '').toLowerCase().includes(q) ||

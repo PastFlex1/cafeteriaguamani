@@ -88,7 +88,21 @@ export default function App() {
     if (savedExpenses) setExpenses(JSON.parse(savedExpenses));
 
     const savedCustomers = localStorage.getItem('caf_customers');
-    if (savedCustomers) setCustomers(JSON.parse(savedCustomers));
+    if (savedCustomers) {
+      try {
+        const parsed: CustomerDetails[] = JSON.parse(savedCustomers);
+        const map = new Map<string, CustomerDetails>();
+        parsed.forEach(c => {
+          const key = (c.documentId || (c as any).id || '').trim();
+          if (key) map.set(key, c);
+        });
+        const cleaned = Array.from(map.values());
+        setCustomers(cleaned);
+        localStorage.setItem('caf_customers', JSON.stringify(cleaned));
+      } catch (e) {
+        // ignore
+      }
+    }
 
     const savedShifts = localStorage.getItem('caf_shifts');
     let loadedShifts: Shift[] = [];
@@ -309,8 +323,13 @@ export default function App() {
 
       // 8. Watch Customers
       const unsubCustomers = onSnapshot(collection(db, "customers"), (snap) => {
-        const list: CustomerDetails[] = [];
-        snap.forEach((d) => list.push(d.data() as CustomerDetails));
+        const map = new Map<string, CustomerDetails>();
+        snap.forEach((d) => {
+          const cust = d.data() as CustomerDetails;
+          const key = (cust.documentId || d.id || '').trim();
+          if (key) map.set(key, cust);
+        });
+        const list = Array.from(map.values());
         setCustomers(list);
         localStorage.setItem('caf_customers', JSON.stringify(list));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'customers'));
