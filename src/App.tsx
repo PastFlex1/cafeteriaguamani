@@ -71,12 +71,15 @@ export default function App() {
 
     const savedMenu = localStorage.getItem('caf_menu_items');
     if (savedMenu) setMenuItems(JSON.parse(savedMenu));
+    else setMenuItems(initialMenuItems);
 
     const savedIngredients = localStorage.getItem('caf_ingredients');
     if (savedIngredients) setIngredients(JSON.parse(savedIngredients));
+    else setIngredients(initialIngredients);
 
     const savedEmployees = localStorage.getItem('caf_employees');
     if (savedEmployees) setEmployees(JSON.parse(savedEmployees));
+    else setEmployees(initialEmployees);
 
     const savedSales = localStorage.getItem('caf_sales');
     if (savedSales) setSales(JSON.parse(savedSales));
@@ -257,30 +260,24 @@ export default function App() {
       const unsubIngredients = onSnapshot(collection(db, "ingredients"), (snap) => {
         const list: Ingredient[] = [];
         snap.forEach((d) => list.push(d.data() as Ingredient));
-        if (list.length > 0) {
-          setIngredients(list);
-          localStorage.setItem('caf_ingredients', JSON.stringify(list));
-        }
+        setIngredients(list);
+        localStorage.setItem('caf_ingredients', JSON.stringify(list));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'ingredients'));
 
       // 3. Watch Menu Items
       const unsubMenuItems = onSnapshot(collection(db, "menuItems"), (snap) => {
         const list: MenuItem[] = [];
         snap.forEach((d) => list.push(d.data() as MenuItem));
-        if (list.length > 0) {
-          setMenuItems(list);
-          localStorage.setItem('caf_menu_items', JSON.stringify(list));
-        }
+        setMenuItems(list);
+        localStorage.setItem('caf_menu_items', JSON.stringify(list));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'menuItems'));
 
       // 4. Watch Employees
       const unsubEmployees = onSnapshot(collection(db, "employees"), (snap) => {
         const list: Employee[] = [];
         snap.forEach((d) => list.push(d.data() as Employee));
-        if (list.length > 0) {
-          setEmployees(list);
-          localStorage.setItem('caf_employees', JSON.stringify(list));
-        }
+        setEmployees(list);
+        localStorage.setItem('caf_employees', JSON.stringify(list));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'employees'));
 
       // 5. Watch Sales
