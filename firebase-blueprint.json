@@ -1,0 +1,137 @@
+{
+  "entities": {
+    "Ingredient": {
+      "title": "Ingredient",
+      "description": "A raw material/input used in the cafeteria",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "stock": { "type": "number" },
+        "minStock": { "type": "number" },
+        "unit": { "type": "string" },
+        "costPerUnit": { "type": "number" }
+      },
+      "required": ["id", "name", "stock", "minStock", "unit", "costPerUnit"]
+    },
+    "MenuItem": {
+      "title": "MenuItem",
+      "description": "An item sold in the boutique cafe",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "cost": { "type": "number" },
+        "category": { "type": "string", "enum": ["cafes", "bebidas_frias", "reposteria", "alimentos"] },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "ingredients": {
+          "type": "array"
+        }
+      },
+      "required": ["id", "name", "price", "cost", "category", "status"]
+    },
+    "Employee": {
+      "title": "Employee",
+      "description": "A staff member or collaborator",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["Barista", "Cajero", "Administrador"] },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "pin": { "type": "string", "maxLength": 4, "minLength": 4 }
+      },
+      "required": ["id", "name", "role", "status", "pin"]
+    },
+    "Sale": {
+      "title": "Sale",
+      "description": "A completed transaction or sale order",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "items": { "type": "array" },
+        "total": { "type": "number" },
+        "cost": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["efectivo", "tarjeta", "transferencia"] },
+        "status": { "type": "string", "enum": ["completed", "refunded"] },
+        "employeeId": { "type": "string" },
+        "employeeName": { "type": "string" },
+        "cashReceived": { "type": "number" },
+        "changeGiven": { "type": "number" }
+      },
+      "required": ["id", "timestamp", "items", "total", "cost", "paymentMethod", "status", "employeeId", "employeeName"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "Operational expense or raw material purchase",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string", "enum": ["insumos", "servicios", "renta", "otros"] },
+        "amount": { "type": "number" }
+      },
+      "required": ["id", "timestamp", "description", "category", "amount"]
+    },
+    "Shift": {
+      "title": "Shift",
+      "description": "An active or closed cashier shift",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "employeeName": { "type": "string" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "cashStart": { "type": "number" },
+        "cashEndExpected": { "type": "number" },
+        "cashEndActual": { "type": "number" },
+        "status": { "type": "string", "enum": ["open", "closed"] }
+      },
+      "required": ["id", "employeeId", "employeeName", "startTime", "cashStart", "status"]
+    },
+    "BusinessConfig": {
+      "title": "BusinessConfig",
+      "description": "Store parameter settings",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" }
+      },
+      "required": ["name"]
+    }
+  },
+  "firestore": {
+    "/config/business": {
+      "schema": "BusinessConfig",
+      "description": "The general settings of the coffee shop"
+    },
+    "/ingredients/{ingredientId}": {
+      "schema": "Ingredient",
+      "description": "Raw material items catalog"
+    },
+    "/menuItems/{itemId}": {
+      "schema": "MenuItem",
+      "description": "Food and drinks menu items"
+    },
+    "/employees/{employeeId}": {
+      "schema": "Employee",
+      "description": "Collaborators registry"
+    },
+    "/sales/{saleId}": {
+      "schema": "Sale",
+      "description": "Register of completed sales"
+    },
+    "/expenses/{expenseId}": {
+      "schema": "Expense",
+      "description": "List of purchase expenses"
+    },
+    "/shifts/{shiftId}": {
+      "schema": "Shift",
+      "description": "Work shifts and cashier log audits"
+    }
+  }
+}

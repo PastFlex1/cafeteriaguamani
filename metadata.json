@@ -1,0 +1,6 @@
+{
+  "name": "Control de Cafetería",
+  "description": "Aplicación integral de gestión y punto de venta para cafeterías, que incluye control de inventario, registro de ventas, analíticas financieras y turnos de personal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
