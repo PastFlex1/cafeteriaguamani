@@ -1258,30 +1258,31 @@ export default function StaffView({
                 {/* Colaborador */}
                 <div>
                   <label className="block text-[10px] uppercase font-black text-zinc-600 mb-1.5">Filtrar por Colaborador</label>
-                  <select
+                  <RetroSelect
+                    options={[
+                      { value: 'all', label: 'TODOS LOS COLABORADORES' },
+                      ...employees.map(emp => ({
+                        value: emp.id,
+                        label: `${emp.name.toUpperCase()} (${emp.role.toUpperCase()})`
+                      }))
+                    ]}
                     value={filterEmployeeId}
-                    onChange={(e) => setFilterEmployeeId(e.target.value)}
-                    className="w-full bg-white border-2 border-black text-xs font-black p-2.5 rounded shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)] focus:outline-none"
-                  >
-                    <option value="all">TODOS LOS COLABORADORES</option>
-                    {employees.map(emp => (
-                      <option key={emp.id} value={emp.id}>{emp.name.toUpperCase()} ({emp.role})</option>
-                    ))}
-                  </select>
+                    onChange={setFilterEmployeeId}
+                  />
                 </div>
 
                 {/* Por Estado de Cuadre */}
                 <div>
                   <label className="block text-[10px] uppercase font-black text-zinc-600 mb-1.5">Estado de Balance</label>
-                  <select
+                  <RetroSelect
+                    options={[
+                      { value: 'all', label: 'TODOS LOS TURNOS' },
+                      { value: 'balanced', label: '✅ BALANCE PERFECTO (CUADRADO)' },
+                      { value: 'unbalanced', label: '⚠️ CON DIFERENCIA (SOBRANTE/FALTANTE)' }
+                    ]}
                     value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
-                    className="w-full bg-white border-2 border-black text-xs font-black p-2.5 rounded shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)] focus:outline-none"
-                  >
-                    <option value="all">TODOS LOS TURNOS</option>
-                    <option value="balanced">✅ BALANCE PERFECTO (CUADRADO)</option>
-                    <option value="unbalanced">⚠️ CON DIFERENCIA (SOBRANTE/FALTANTE)</option>
-                  </select>
+                    onChange={setFilterStatus}
+                  />
                 </div>
 
                 {/* Preset de Fecha */}
