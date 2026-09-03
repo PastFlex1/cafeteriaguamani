@@ -138,8 +138,14 @@ export default function SalesView({
     return matchesSearch && matchesPayment && matchesEmployee && matchesDate;
   });
 
+  const isPrintingRef = React.useRef(false);
   const handlePrint = () => {
+    if (isPrintingRef.current) return;
+    isPrintingRef.current = true;
     window.print();
+    setTimeout(() => {
+      isPrintingRef.current = false;
+    }, 1200);
   };
 
   const taxRate = 0.0; // 0% IVA

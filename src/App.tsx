@@ -1352,16 +1352,6 @@ export default function App() {
         <p className="font-retro-heavy text-yellow-300 text-sm mb-1 uppercase tracking-widest">⚡️ {businessName} SYSTEM ONLINE ⚡️</p>
         <p>COSMIC CAFE POS TERMINAL • MODEL 1995 • ALL RIGHTS RESERVED • INSERT COIN TO PLAY</p>
         <div className="flex flex-col items-center justify-center mt-3 gap-2">
-          <button 
-            onClick={() => {
-              if (window.confirm('⚠️ ¿Estás seguro de BORRAR TODO EL SISTEMA? Esto eliminará tus ventas, empleados, insumos y TODOS TUS PRODUCTOS. Quedará como nuevo de fábrica. Esta acción NO se puede deshacer.')) {
-                handleWipeEverything();
-              }
-            }}
-            className="px-3 py-1 bg-red-600 text-white font-black text-[9px] uppercase rounded-md hover:bg-red-500 border border-red-800 transition-colors"
-          >
-            🗑️ Limpiar Datos de Prueba
-          </button>
           <p className="text-zinc-400 text-[10px] uppercase font-black tracking-widest">
             Desarrollado por <span className="text-pink-400">Palma Nexus Solutions</span> - <span className="text-cyan-400">099 821 2307</span>
           </p>

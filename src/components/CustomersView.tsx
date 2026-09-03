@@ -100,17 +100,38 @@ export default function CustomersView({
     setIsLoadedFromDb(false);
     setLoadedSource(null);
     setIsSearchingCedula(true);
-    setSearchCedulaError(null);
-
     try {
-      const proxyUrl = 'https://infoplacas.herokuapp.com/';
       const targetUrl = 'https://si.secap.gob.ec/sisecap/logeo_web/json/busca_persona_registro_civil.php';
+      const proxyUrl = 'https://infoplacas.herokuapp.com/';
 
-      const response = await fetch(proxyUrl + targetUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ documento: cleanCedula, tipo: '1' })
-      });
+      let response: Response;
+      try {
+        response = await fetch(targetUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ documento: cleanCedula, tipo: '1' })
+        });
+      } catch (directErr) {
+        response = await fetch(proxyUrl + targetUrl, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: new URLSearchParams({ documento: cleanCedula, tipo: '1' })
+        });
+      }
+
+      if (!response.ok) {
+        response = await fetch(proxyUrl + targetUrl, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: new URLSearchParams({ documento: cleanCedula, tipo: '1' })
+        });
+      }
 
       if (!response.ok) {
         throw new Error(`Error en servidor: ${response.status}`);

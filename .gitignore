@@ -4,5 +4,7 @@ dist/
 coverage/
 .DS_Store
 *.log
+release/
+dist-electron/
 .env*
 !.env.example

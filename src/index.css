@@ -187,12 +187,13 @@ input[type="number"] {
   /* Configure paper size to 80mm with automatic height and zero page margin */
   @page {
     size: 80mm auto;
-    margin: 0;
+    margin: 0 !important;
   }
 
   /* Set canvas base to exactly 80mm and hide unnecessary default browser margins */
   html, body {
-    width: 80mm;
+    width: 80mm !important;
+    height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
     background: #ffffff !important;
@@ -200,6 +201,7 @@ input[type="number"] {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     font-family: 'Share Tech Mono', monospace, Courier, monospace !important;
+    overflow: visible !important;
   }
 
   /* Hide absolutely everything on the viewport */
@@ -207,25 +209,30 @@ input[type="number"] {
     visibility: hidden !important;
   }
 
-  /* Exclusively make the ticket content visible and positioned at the top-left */
+  /* Exclusively make the ticket content visible and positioned centrally */
   .printable-ticket, .printable-ticket * {
     visibility: visible !important;
   }
 
   .printable-ticket {
-    position: absolute !important;
+    position: fixed !important;
     left: 0 !important;
     top: 0 !important;
-    width: 74mm !important; /* Safe printable width inside 80mm paper */
-    max-width: 74mm !important;
-    margin: 0 !important;
-    padding: 4mm 2mm !important;
+    width: 78mm !important; /* Maximized safe printable width inside 80mm paper */
+    max-width: 78mm !important;
+    margin: 0 auto !important; /* Perfectly centered on 80mm paper */
+    padding: 2mm 1mm !important;
     background: #ffffff !important;
     color: #000000 !important;
     box-shadow: none !important;
     border: none !important;
     overflow: visible !important;
     max-height: none !important;
+    box-sizing: border-box !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   /* Adjust typography & line spacing for optimal monochrome thermal contrast */
@@ -235,14 +242,30 @@ input[type="number"] {
   .printable-ticket div {
     color: #000000 !important;
     background-color: transparent !important;
-    font-size: 11px !important;
-    line-height: 1.3 !important;
+    font-size: 13px !important;
+    line-height: 1.35 !important;
     border-color: #000000 !important;
   }
 
-  /* Make headings stand out slightly */
+  /* Override tiny font utility classes for print so text is clearly legible without exceeding 80mm */
+  .printable-ticket .text-\[10px\],
+  .printable-ticket .text-\[9px\],
+  .printable-ticket .text-\[8px\],
+  .printable-ticket .text-xs {
+    font-size: 12.5px !important;
+  }
+
+  .printable-ticket .text-sm {
+    font-size: 14.5px !important;
+  }
+
+  .printable-ticket .text-base {
+    font-size: 16px !important;
+  }
+
+  /* Make headings stand out clearly */
   .printable-ticket h4 {
-    font-size: 13px !important;
+    font-size: 17px !important;
     font-weight: bold !important;
     color: #000000 !important;
     background-color: transparent !important;

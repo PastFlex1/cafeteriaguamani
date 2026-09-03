@@ -192,6 +192,16 @@ export default function POSView({
   const [transferNumber, setTransferNumber] = useState('');
   const [recentSaleTicket, setRecentSaleTicket] = useState<Sale | null>(null);
 
+  const isPrintingRef = React.useRef(false);
+  const handleTriggerPrint = () => {
+    if (isPrintingRef.current) return;
+    isPrintingRef.current = true;
+    window.print();
+    setTimeout(() => {
+      isPrintingRef.current = false;
+    }, 1200);
+  };
+
   // Customer details states
   const [customerName, setCustomerName] = useState('');
   const [customerDocumentId, setCustomerDocumentId] = useState('');
@@ -266,17 +276,38 @@ export default function POSView({
 
     setIsLoadedFromDb(false);
     setIsSearchingCedula(true);
-    setSearchCedulaError(null);
-
     try {
-      const proxyUrl = 'https://infoplacas.herokuapp.com/';
       const targetUrl = 'https://si.secap.gob.ec/sisecap/logeo_web/json/busca_persona_registro_civil.php';
+      const proxyUrl = 'https://infoplacas.herokuapp.com/';
 
-      const response = await fetch(proxyUrl + targetUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ documento: cleanCedula, tipo: '1' })
-      });
+      let response: Response;
+      try {
+        response = await fetch(targetUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ documento: cleanCedula, tipo: '1' })
+        });
+      } catch (directErr) {
+        response = await fetch(proxyUrl + targetUrl, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: new URLSearchParams({ documento: cleanCedula, tipo: '1' })
+        });
+      }
+
+      if (!response.ok) {
+        response = await fetch(proxyUrl + targetUrl, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: new URLSearchParams({ documento: cleanCedula, tipo: '1' })
+        });
+      }
 
       if (!response.ok) {
         throw new Error(`Error en servidor: ${response.status}`);
@@ -1735,7 +1766,7 @@ export default function POSView({
             <div className="bg-pink-100 border-t-3 border-black p-4 flex gap-3">
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={handleTriggerPrint}
                 className="flex-1 border-2 border-black bg-white hover:bg-zinc-100 rounded-lg py-2.5 text-xs font-black uppercase tracking-wider text-black transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5"
               >
                 <Printer className="w-4 h-4 stroke-[2.5]" />
