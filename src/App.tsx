@@ -4,23 +4,26 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Receipt, 
-  Package, 
-  TrendingUp, 
-  Users, 
+import {
+  Receipt,
+  Package,
+  TrendingUp,
+  Users,
   AlertTriangle,
-  Coffee
+  Coffee,
+  Settings
 } from 'lucide-react';
 
-import { MenuItem, Ingredient, Employee, Sale, Shift, Expense, SaleItem, CustomerDetails } from './types';
-import { 
-  initialIngredients, 
-  initialMenuItems, 
-  initialEmployees, 
-  generateHistoricalSales, 
-  initialExpenses 
+import { MenuItem, Ingredient, Employee, Sale, Shift, Expense, SaleItem, CustomerDetails, CompanyConfig, ElectronicInvoice, InvoiceItem, VatRateType } from './types';
+import {
+  initialIngredients,
+  initialMenuItems,
+  initialEmployees,
+  generateHistoricalSales,
+  initialExpenses,
+  defaultCompanyConfig
 } from './initialData';
+import { generateAccessKey, generateSriInvoiceXml } from './utils/sriCalculations';
 
 import Header from './components/Header';
 import POSView from './components/POSView';
@@ -29,20 +32,22 @@ import AnalyticsView from './components/AnalyticsView';
 import StaffView from './components/StaffView';
 import SalesView from './components/SalesView';
 import CustomersView from './components/CustomersView';
+import CompanyConfigView from './components/CompanyConfigView';
+import InvoiceView from './components/InvoiceView';
 
 // SQLite Database imports
-import { 
-  db, 
-  handleFirestoreError, 
+import {
+  db,
+  handleFirestoreError,
   OperationType,
-  collection, 
-  doc, 
-  setDoc, 
+  collection,
+  doc,
+  setDoc,
   getDoc,
-  deleteDoc, 
-  getDocs, 
-  onSnapshot, 
-  writeBatch 
+  deleteDoc,
+  getDocs,
+  onSnapshot,
+  writeBatch
 } from './db';
 import { removeUndefined } from './utils';
 
@@ -56,18 +61,27 @@ export default function App() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [customers, setCustomers] = useState<CustomerDetails[]>([]);
+  const [invoices, setInvoices] = useState<ElectronicInvoice[]>([]);
+  const [companyConfig, setCompanyConfig] = useState<CompanyConfig>(defaultCompanyConfig);
 
   // 2. Session / Shift States
   const [activeEmployee, setActiveEmployee] = useState<Employee | null>(null);
   const [activeShift, setActiveShift] = useState<Shift | null>(null);
 
   // 3. UI Tab State
-  const [activeTab, setActiveTab] = useState<'pos' | 'inventario' | 'analiticas' | 'personal' | 'ventas' | 'clientes'>('pos');
+  const [activeTab, setActiveTab] = useState<'pos' | 'ventas' | 'facturacion' | 'inventario' | 'analiticas' | 'personal' | 'clientes' | 'configuracion'>('pos');
 
   // Load cache on boot (instant visual response)
   useEffect(() => {
     const savedName = localStorage.getItem('caf_business_name');
     if (savedName) setBusinessName(savedName);
+
+    const savedCompanyConfig = localStorage.getItem('caf_company_config');
+    if (savedCompanyConfig) {
+      try {
+        setCompanyConfig(JSON.parse(savedCompanyConfig));
+      } catch (e) { }
+    }
 
     const savedMenu = localStorage.getItem('caf_menu_items');
     if (savedMenu) setMenuItems(JSON.parse(savedMenu));
@@ -104,6 +118,15 @@ export default function App() {
       }
     }
 
+    const savedInvoices = localStorage.getItem('caf_invoices');
+    if (savedInvoices) {
+      try {
+        setInvoices(JSON.parse(savedInvoices));
+      } catch (e) {
+        // ignore
+      }
+    }
+
     const savedShifts = localStorage.getItem('caf_shifts');
     let loadedShifts: Shift[] = [];
     if (savedShifts) {
@@ -120,6 +143,15 @@ export default function App() {
         if (associatedEmployee) setActiveEmployee(associatedEmployee);
       }
     }
+
+    // Load company config from SQLite if available
+    getDoc(doc(db, 'settings', 'company_config')).then(snapshot => {
+      if (snapshot.exists()) {
+        const data = snapshot.data() as CompanyConfig;
+        setCompanyConfig(data);
+        localStorage.setItem('caf_company_config', JSON.stringify(data));
+      }
+    }).catch(() => { });
   }, []);
 
   // Guarantee that an active employee is always set (for single-user mode)
@@ -147,10 +179,10 @@ export default function App() {
     const admin = employees.find(e => e.id === 'emp_1');
     if (admin && admin.name === 'Sofía Martínez') {
       const updatedAdmin = { ...admin, name: 'GUERRERO CARDENAS ALEJANDRA ESTEFANIA' };
-      
+
       // Update in local state to immediately show
       setEmployees(prev => prev.map(e => e.id === 'emp_1' ? updatedAdmin : e));
-      
+
       // Update in Firestore
       setDoc(doc(db, "employees", "emp_1"), updatedAdmin).catch(err => {
         console.error("Error updating admin name in Firestore:", err);
@@ -334,6 +366,15 @@ export default function App() {
         localStorage.setItem('caf_customers', JSON.stringify(list));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'customers'));
 
+      // 9. Watch Invoices
+      const unsubInvoices = onSnapshot(collection(db, "invoices"), (snap) => {
+        const list: ElectronicInvoice[] = [];
+        snap.forEach((d) => list.push(d.data() as ElectronicInvoice));
+        list.sort((a, b) => new Date(b.fechaEmision).getTime() - new Date(a.fechaEmision).getTime());
+        setInvoices(list);
+        localStorage.setItem('caf_invoices', JSON.stringify(list));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'invoices'));
+
       return () => {
         unsubIngredients();
         unsubMenuItems();
@@ -342,6 +383,7 @@ export default function App() {
         unsubExpenses();
         unsubShifts();
         unsubCustomers();
+        unsubInvoices();
       };
     });
 
@@ -379,6 +421,31 @@ export default function App() {
   const syncShifts = async (newShifts: Shift[]) => {
     setShifts(newShifts);
     localStorage.setItem('caf_shifts', JSON.stringify(newShifts));
+  };
+
+  const syncInvoices = async (newInvoices: ElectronicInvoice[]) => {
+    setInvoices(newInvoices);
+    localStorage.setItem('caf_invoices', JSON.stringify(newInvoices));
+  };
+
+  const handleAddInvoice = async (newInvoice: ElectronicInvoice) => {
+    const updated = [newInvoice, ...invoices];
+    syncInvoices(updated);
+    try {
+      await setDoc(doc(db, "invoices", newInvoice.id), removeUndefined(newInvoice));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, `invoices/${newInvoice.id}`);
+    }
+  };
+
+  const handleUpdateInvoice = async (updatedInvoice: ElectronicInvoice) => {
+    const updated = invoices.map(inv => inv.id === updatedInvoice.id ? updatedInvoice : inv);
+    syncInvoices(updated);
+    try {
+      await setDoc(doc(db, "invoices", updatedInvoice.id), removeUndefined(updatedInvoice));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `invoices/${updatedInvoice.id}`);
+    }
   };
 
   const handleUpdateBusinessName = async (name: string) => {
@@ -434,9 +501,9 @@ export default function App() {
   const handleEndShift = async (cashEndActual: number, transfersActual: number = 0) => {
     if (!activeShift) return;
 
-    const shiftSales = sales.filter(s => 
-      s.status === 'completed' && 
-      s.employeeId === activeShift.employeeId && 
+    const shiftSales = sales.filter(s =>
+      s.status === 'completed' &&
+      s.employeeId === activeShift.employeeId &&
       new Date(s.timestamp) >= new Date(activeShift.startTime)
     );
 
@@ -473,21 +540,53 @@ export default function App() {
 
   // Register Venta POS
   const handleRegisterSale = (
-    saleItems: SaleItem[], 
+    saleItems: SaleItem[],
     paymentMethod: 'efectivo' | 'tarjeta' | 'transferencia',
     cashReceived?: number,
     changeGiven?: number,
     transferNumber?: string,
     customer?: CustomerDetails,
     invoiceNumber?: string,
-    discount?: number
+    discount?: number,
+    taxRateParam?: number,
+    documentType: 'nota_venta' | 'factura' = 'nota_venta',
+    accessKey?: string
   ) => {
     if (!activeEmployee) return;
 
-    const total = saleItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+    const subtotalBruto = saleItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     const cost = saleItems.reduce((acc, item) => acc + (item.cost * item.quantity), 0);
-    const taxRate = 0.0;
-    const finalTotalWithTax = Math.max(0, (total - (discount || 0)) * (1 + taxRate));
+    const defaultIvaPct = companyConfig.tarifaIvaPredeterminada !== undefined ? companyConfig.tarifaIvaPredeterminada : 15;
+    const taxRate = taxRateParam !== undefined ? taxRateParam : (defaultIvaPct / 100);
+    // El precio de venta ya incluye IVA; el total a cobrar NO aumenta, sino que se desglosa el IVA
+    const finalTotalWithTax = Math.max(0, subtotalBruto - (discount || 0));
+
+    let subtotal15 = 0;
+    let subtotal5 = 0;
+    let subtotal0 = 0;
+    let totalIvaDesglosado = 0;
+
+    saleItems.forEach((item) => {
+      const itemGross = item.price * item.quantity;
+      const itemDisc = item.discountPercent ? (itemGross * item.discountPercent) / 100 : 0;
+      const itemTotalConIva = Math.max(0, itemGross - itemDisc);
+      const itemRatePct = item.tarifaIva !== undefined ? item.tarifaIva : Math.round(taxRate * 100);
+      const itemRate = itemRatePct / 100;
+      const itemBaseSinIva = itemRate > 0 ? itemTotalConIva / (1 + itemRate) : itemTotalConIva;
+      const itemVat = itemTotalConIva - itemBaseSinIva;
+
+      if (itemRatePct >= 12) {
+        subtotal15 += itemBaseSinIva;
+      } else if (itemRatePct > 0) {
+        subtotal5 += itemBaseSinIva;
+      } else {
+        subtotal0 += itemBaseSinIva;
+      }
+      totalIvaDesglosado += itemVat;
+    });
+
+    const taxableBase = subtotal15 + subtotal5 + subtotal0;
+    const taxAmount = totalIvaDesglosado;
 
     const newSale: Sale = {
       id: `sale_${Date.now()}`,
@@ -505,13 +604,122 @@ export default function App() {
       transferNumber,
       customer,
       discount: discount || 0,
-      subtotal: total
+      subtotal: taxableBase,
+      taxRate: taxRate,
+      tax: taxAmount,
+      documentType,
+      accessKey,
     };
+
+    // Update CompanyConfig sequentials
+    if (documentType === 'factura') {
+      const nextFact = (companyConfig.secuencialFactura || 1) + 1;
+      handleUpdateCompanyConfig({ ...companyConfig, secuencialFactura: nextFact });
+
+      // Generate Electronic Invoice for Facturación module
+      const fechaEmision = new Date().toISOString().split('T')[0];
+      const secNum = companyConfig.secuencialFactura || 1;
+      const secuencialStr = secNum.toString().padStart(9, '0');
+      const estab = companyConfig.codigoEstablecimiento || '001';
+      const pto = companyConfig.puntoEmision || '001';
+      const numeroComprobanteStr = invoiceNumber && invoiceNumber.includes('-') ? invoiceNumber : `${estab}-${pto}-${secuencialStr}`;
+
+      const generatedClave = accessKey || generateAccessKey({
+        fechaEmision,
+        tipoComprobante: '01',
+        rucEmisor: companyConfig.ruc || '1725403883001',
+        ambiente: companyConfig.ambiente || '1',
+        establecimiento: estab,
+        puntoEmision: pto,
+        secuencial: secuencialStr,
+        tipoEmision: companyConfig.tipoEmision || '1',
+      });
+
+      let formaPagoSri = '01'; // Efectivo
+      if (paymentMethod === 'tarjeta') formaPagoSri = '19';
+      if (paymentMethod === 'transferencia') formaPagoSri = '20';
+
+      const invoiceItems: InvoiceItem[] = saleItems.map(item => {
+        const itemGross = item.price * item.quantity;
+        const itemDiscount = item.discountPercent ? (itemGross * item.discountPercent) / 100 : 0;
+        const itemTotalConIva = Math.max(0, itemGross - itemDiscount);
+        const itemRatePct = item.tarifaIva !== undefined ? item.tarifaIva : Math.round(taxRate * 100);
+        const itemRate = itemRatePct / 100;
+        const itemTotalSinImp = itemRate > 0 ? itemTotalConIva / (1 + itemRate) : itemTotalConIva;
+        const itemVat = itemTotalConIva - itemTotalSinImp;
+        const itemDescuentoSinImp = itemRate > 0 ? itemDiscount / (1 + itemRate) : itemDiscount;
+        const itemPrecioUnitSinImp = itemRate > 0 ? item.price / (1 + itemRate) : item.price;
+
+        return {
+          id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          codigoPrincipal: item.menuItemId,
+          descripcion: item.name,
+          cantidad: item.quantity,
+          precioUnitario: Number(itemPrecioUnitSinImp.toFixed(4)),
+          descuento: Number(itemDescuentoSinImp.toFixed(2)),
+          tarifaIva: (itemRatePct >= 12 ? 15 : itemRatePct > 0 ? 5 : 0) as VatRateType,
+          precioTotalSinImpuesto: Number(itemTotalSinImp.toFixed(2)),
+          valorIva: Number(itemVat.toFixed(2)),
+          valorTotal: Number(itemTotalConIva.toFixed(2)),
+        };
+      });
+
+      const newInvoice: ElectronicInvoice = {
+        id: `inv_${Date.now()}`,
+        tipoDocumento: '01',
+        establecimiento: estab,
+        puntoEmision: pto,
+        secuencial: secuencialStr,
+        numeroComprobante: numeroComprobanteStr,
+        claveAcceso: generatedClave,
+        fechaEmision,
+        cliente: {
+          identificacion: customer?.documentId || '9999999999999',
+          razonSocial: customer?.name || 'CONSUMIDOR FINAL',
+          direccion: customer?.address || 'Quito, Ecuador',
+          telefono: customer?.phone || '999999999',
+          email: customer?.email || 'cliente@factura.com',
+        },
+        items: invoiceItems,
+        subtotal15: Number(subtotal15.toFixed(2)),
+        subtotal5: Number(subtotal5.toFixed(2)),
+        subtotal0: Number(subtotal0.toFixed(2)),
+        subtotalNoObjeto: 0,
+        subtotalExento: 0,
+        totalDescuento: discount || 0,
+        subtotalSinImpuestos: Number(taxableBase.toFixed(2)),
+        totalIva: Number(taxAmount.toFixed(2)),
+        propina: 0,
+        importeTotal: Number(finalTotalWithTax.toFixed(2)),
+        pagos: [
+          {
+            formaPago: formaPagoSri,
+            total: finalTotalWithTax,
+            ...(paymentMethod === 'transferencia' && transferNumber ? { numeroTransferencia: transferNumber } : {})
+          }
+        ],
+        estado: 'AUTORIZADO',
+        numeroAutorizacion: generatedClave,
+        fechaAutorizacion: `${fechaEmision} ${new Date().toLocaleTimeString('es-EC')}`,
+        observaciones: `Factura POS emitida por ${activeEmployee.name}`,
+      };
+
+      try {
+        newInvoice.xml = generateSriInvoiceXml(newInvoice, companyConfig);
+      } catch (err) {
+        console.warn('Could not generate SRI XML:', err);
+      }
+
+      handleAddInvoice(newInvoice);
+    } else {
+      const nextNota = (companyConfig.secuencialNotaVenta || 1) + 1;
+      handleUpdateCompanyConfig({ ...companyConfig, secuencialNotaVenta: nextNota });
+    }
 
     const updatedIngredients = [...ingredients];
     const updatedMenuItems = [...menuItems];
     const changedMenuItems = new Set<string>();
-    
+
     const deductMenuItem = (mItem: MenuItem, qty: number) => {
       if (!mItem.ingredients || mItem.ingredients.length === 0) {
         if (mItem.stock !== undefined) {
@@ -539,7 +747,7 @@ export default function App() {
           const ingredientIdx = updatedIngredients.findIndex(ing => ing.id === req.ingredientId);
           if (ingredientIdx > -1) {
             updatedIngredients[ingredientIdx].stock = Math.max(
-              0, 
+              0,
               updatedIngredients[ingredientIdx].stock - (req.quantity * qty)
             );
           }
@@ -571,7 +779,7 @@ export default function App() {
       try {
         const batch = writeBatch(db);
         batch.set(doc(db, "sales", newSale.id), removeUndefined(newSale));
-        
+
         if (newSale.customer && newSale.customer.documentId.trim() && newSale.customer.documentId.trim() !== '9999999999') {
           batch.set(doc(db, "customers", newSale.customer.documentId.trim()), removeUndefined(newSale.customer));
         }
@@ -586,12 +794,12 @@ export default function App() {
         });
 
         if (activeShift) {
-          const shiftSales = [newSale, ...sales].filter(s => 
-            s.status === 'completed' && 
-            s.employeeId === activeShift.employeeId && 
+          const shiftSales = [newSale, ...sales].filter(s =>
+            s.status === 'completed' &&
+            s.employeeId === activeShift.employeeId &&
             new Date(s.timestamp) >= new Date(activeShift.startTime)
           );
-          
+
           const cashSalesTotal = shiftSales
             .filter(s => s.paymentMethod === 'efectivo')
             .reduce((sum, s) => sum + s.total, 0);
@@ -645,6 +853,34 @@ export default function App() {
   const handleVoidSale = async (saleId: string) => {
     const saleToVoid = sales.find(s => s.id === saleId);
     if (!saleToVoid || saleToVoid.status === 'voided') return;
+
+    const docId = (saleToVoid.customer?.documentId || '').trim();
+    const custName = (saleToVoid.customer?.name || '').trim().toUpperCase();
+    const isCf =
+      !docId ||
+      docId === '9999999999999' ||
+      docId === '9999999999' ||
+      /^9+$/.test(docId) ||
+      custName.includes('CONSUMIDOR FINAL');
+
+    if (saleToVoid.documentType === 'factura' && isCf) {
+      alert('Según la normativa vigente del SRI, las facturas electrónicas emitidas a CONSUMIDOR FINAL no pueden ser anuladas.');
+      return;
+    }
+
+    if (saleToVoid.documentType === 'factura') {
+      const nextInvoices = invoices.map((inv) => {
+        if (
+          (saleToVoid.accessKey && inv.claveAcceso === saleToVoid.accessKey) ||
+          (saleToVoid.invoiceNumber && inv.numeroComprobante === saleToVoid.invoiceNumber)
+        ) {
+          return { ...inv, estado: 'ANULADO' as const };
+        }
+        return inv;
+      });
+      setInvoices(nextInvoices);
+      localStorage.setItem('caf_sri_invoices', JSON.stringify(nextInvoices));
+    }
 
     const updatedSales = sales.map(s => {
       if (s.id === saleId) {
@@ -706,7 +942,7 @@ export default function App() {
 
     try {
       const batch = writeBatch(db);
-      
+
       const updatedSaleDoc = { ...saleToVoid, status: 'voided' as const };
       batch.set(doc(db, "sales", saleId), removeUndefined(updatedSaleDoc));
 
@@ -720,12 +956,12 @@ export default function App() {
       });
 
       if (activeShift) {
-        const shiftSales = updatedSales.filter(s => 
-          s.status === 'completed' && 
-          s.employeeId === activeShift.employeeId && 
+        const shiftSales = updatedSales.filter(s =>
+          s.status === 'completed' &&
+          s.employeeId === activeShift.employeeId &&
           new Date(s.timestamp) >= new Date(activeShift.startTime)
         );
-        
+
         const cashSalesTotal = shiftSales
           .filter(s => s.paymentMethod === 'efectivo')
           .reduce((sum, s) => sum + s.total, 0);
@@ -813,7 +1049,7 @@ export default function App() {
 
     try {
       const batch = writeBatch(db);
-      
+
       batch.delete(doc(db, "sales", saleId));
 
       if (saleToDelete.status === 'completed') {
@@ -827,12 +1063,12 @@ export default function App() {
       }
 
       if (activeShift) {
-        const shiftSales = updatedSales.filter(s => 
-          s.status === 'completed' && 
-          s.employeeId === activeShift.employeeId && 
+        const shiftSales = updatedSales.filter(s =>
+          s.status === 'completed' &&
+          s.employeeId === activeShift.employeeId &&
           new Date(s.timestamp) >= new Date(activeShift.startTime)
         );
-        
+
         const cashSalesTotal = shiftSales
           .filter(s => s.paymentMethod === 'efectivo')
           .reduce((sum, s) => sum + s.total, 0);
@@ -1190,12 +1426,12 @@ export default function App() {
         }
       });
 
-      const defaultAdmin = { 
-        id: 'emp_1', 
-        name: 'GUERRERO CARDENAS ALEJANDRA ESTEFANIA', 
-        role: 'Administrador' as const, 
-        status: 'active' as const, 
-        pin: '1234' 
+      const defaultAdmin = {
+        id: 'emp_1',
+        name: 'GUERRERO CARDENAS ALEJANDRA ESTEFANIA',
+        role: 'Administrador' as const,
+        status: 'active' as const,
+        pin: '1234'
       };
       batch.set(doc(db, "employees", defaultAdmin.id), defaultAdmin);
       batch.set(doc(db, "config", "system"), { seeded: true });
@@ -1222,12 +1458,26 @@ export default function App() {
     }
   };
 
+  const handleUpdateCompanyConfig = async (newConfig: CompanyConfig) => {
+    setCompanyConfig(newConfig);
+    localStorage.setItem('caf_company_config', JSON.stringify(newConfig));
+    if (newConfig.nombreComercial) {
+      setBusinessName(newConfig.nombreComercial);
+      localStorage.setItem('caf_business_name', newConfig.nombreComercial);
+    }
+    try {
+      await setDoc(doc(db, 'settings', 'company_config'), removeUndefined(newConfig));
+    } catch (e) {
+      console.warn('Error guardando configuración SRI en SQLite:', e);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col font-sans text-black selection:bg-yellow-300 selection:text-black" id="main-layout">
       {/* Top Combined Sticky Header & Navigation */}
       <div className="sticky top-0 z-40 w-full shadow-[0_4px_0px_0px_rgba(0,0,0,1)]">
         {/* 1. Dynamic Header controls */}
-        <Header 
+        <Header
           businessName={businessName}
           employees={employees}
           activeEmployee={activeEmployee}
@@ -1239,29 +1489,31 @@ export default function App() {
         />
 
         {/* 2. Visual Navigation Tabs */}
-        <nav className="bg-yellow-300 border-b-4 border-black px-6 py-3" id="sub-navigation">
-          <div className="max-w-7xl mx-auto flex gap-3 overflow-x-auto scrollbar-none py-1">
+        <nav className="bg-yellow-300 border-b-4 border-black px-2 sm:px-4 md:px-6 py-1.5 sm:py-2" id="sub-navigation">
+          <div className="max-w-[1700px] w-full mx-auto flex items-center justify-between gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none py-0.5">
             {[
-              { id: 'pos', name: '🎰 PUNTO DE VENTA', icon: Receipt },
-              { id: 'ventas', name: '🧾 REGISTRO DE VENTAS', icon: Receipt },
-              { id: 'inventario', name: '📦 INVENTARIO', icon: Package },
-              { id: 'analiticas', name: '📈 LEDGER & REPORTES', icon: TrendingUp },
-              { id: 'personal', name: '👥 PERSONAL & ARQUEOS', icon: Users },
-              { id: 'clientes', name: '👤 CLIENTES', icon: Users },
+              { id: 'pos', name: '🎰 PUNTO DE VENTA', shortName: '🎰 POS', icon: Receipt },
+              { id: 'ventas', name: '📜 REGISTRO DE VENTAS', shortName: '📜 VENTAS', icon: Receipt },
+              { id: 'facturacion', name: '🧾 FACTURAS SRI', shortName: '🧾 FACTURAS', icon: Receipt },
+              { id: 'inventario', name: '📦 INVENTARIO', shortName: '📦 INVENTARIO', icon: Package },
+              { id: 'analiticas', name: '📈 LEDGER & REPORTES', shortName: '📈 REPORTES', icon: TrendingUp },
+              { id: 'personal', name: '👥 PERSONAL & ARQUEOS', shortName: '👥 PERSONAL', icon: Users },
+              { id: 'clientes', name: '👤 CLIENTES', shortName: '👤 CLIENTES', icon: Users },
+              { id: 'configuracion', name: '⚙️ CONFIG. SRI', shortName: '⚙️ CONFIG. SRI', icon: Settings },
             ].map((tab) => {
               const isSelected = activeTab === tab.id;
-              
+
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center gap-2 py-2.5 px-4 border-3 border-black rounded-lg text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
-                    isSelected 
-                      ? 'bg-pink-400 text-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] translate-x-[-2px] translate-y-[-2px]' 
-                      : 'bg-white text-black hover:bg-zinc-100 hover:translate-x-[-1px] hover:translate-y-[-1px] shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]'
-                  }`}
+                  className={`flex-1 min-w-fit flex items-center justify-center gap-1 sm:gap-1.5 py-1.5 sm:py-2 px-2 sm:px-2.5 2xl:px-3 border-2 sm:border-3 border-black rounded-lg text-[10px] sm:text-[11px] 2xl:text-xs font-black uppercase tracking-wide transition-all whitespace-nowrap cursor-pointer shrink-0 xl:shrink ${isSelected
+                      ? 'bg-pink-400 text-black shadow-[2.5px_2.5px_0px_0px_rgba(0,0,0,1)] translate-x-[-1px] translate-y-[-1px]'
+                      : 'bg-white text-black hover:bg-zinc-100 hover:translate-x-[-1px] hover:translate-y-[-1px] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]'
+                    }`}
                 >
-                  <span>{tab.name}</span>
+                  <span className="hidden 2xl:inline">{tab.name}</span>
+                  <span className="2xl:hidden">{tab.shortName}</span>
                 </button>
               );
             })}
@@ -1270,9 +1522,9 @@ export default function App() {
       </div>
 
       {/* 3. Main Work View Panels */}
-      <main className="flex-1 px-6 py-8 max-w-7xl w-full mx-auto" id="app-workspace">
+      <main className="flex-1 px-3 sm:px-6 py-4 sm:py-6 max-w-[1700px] w-full mx-auto" id="app-workspace">
         {activeTab === 'pos' && (
-          <POSView 
+          <POSView
             businessName={businessName}
             menuItems={menuItems}
             ingredients={ingredients}
@@ -1281,13 +1533,15 @@ export default function App() {
             shiftsHistory={shifts}
             sales={sales}
             customers={customers}
+            company={companyConfig}
             onRegisterSale={handleRegisterSale}
             onSaveCustomer={handleSaveCustomer}
+            onUpdateCompany={handleUpdateCompanyConfig}
           />
         )}
 
         {activeTab === 'inventario' && (
-          <InventoryView 
+          <InventoryView
             ingredients={ingredients}
             menuItems={menuItems}
             onRestockIngredient={handleRestockIngredient}
@@ -1303,17 +1557,18 @@ export default function App() {
         )}
 
         {activeTab === 'analiticas' && (
-          <AnalyticsView 
+          <AnalyticsView
             sales={sales}
             expenses={expenses}
             shifts={shifts}
+            invoices={invoices}
             onAddExpense={handleAddExpense}
             onRemoveExpense={handleRemoveExpense}
           />
         )}
 
         {activeTab === 'personal' && (
-          <StaffView 
+          <StaffView
             employees={employees}
             shiftsHistory={shifts}
             activeEmployee={activeEmployee}
@@ -1327,13 +1582,28 @@ export default function App() {
         )}
 
         {activeTab === 'ventas' && (
-          <SalesView 
+          <SalesView
             sales={sales}
             menuItems={menuItems}
             ingredients={ingredients}
             employees={employees}
+            company={companyConfig}
             onVoidSale={handleVoidSale}
             onDeleteSale={handleDeleteSale}
+          />
+        )}
+
+        {activeTab === 'facturacion' && (
+          <InvoiceView
+            company={companyConfig}
+            invoices={invoices}
+            customers={customers}
+            menuItems={menuItems}
+            ingredients={ingredients}
+            onAddInvoice={handleAddInvoice}
+            onUpdateInvoice={handleUpdateInvoice}
+            onSaveCustomer={handleSaveCustomer}
+            onUpdateCompany={handleUpdateCompanyConfig}
           />
         )}
 
@@ -1343,6 +1613,13 @@ export default function App() {
             sales={sales}
             onSaveCustomer={handleSaveCustomer}
             onDeleteCustomer={handleDeleteCustomer}
+          />
+        )}
+
+        {activeTab === 'configuracion' && (
+          <CompanyConfigView
+            company={companyConfig}
+            onUpdateCompany={handleUpdateCompanyConfig}
           />
         )}
       </main>

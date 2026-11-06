@@ -99,20 +99,20 @@ export default function Header({
   };
 
   return (
-    <header className="bg-cyan-300 border-b-4 border-black px-6 py-4" id="app-header">
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
+    <header className="bg-cyan-300 border-b-4 border-black px-3 sm:px-6 py-2.5 sm:py-3" id="app-header">
+      <div className="max-w-[1700px] w-full mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-2.5 md:gap-4">
         {/* Logo and Business Info */}
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-lg bg-pink-400 border-3 border-black flex items-center justify-center text-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:scale-105 transition-transform duration-200 animate-bounce" id="brand-logo">
-            <Coffee className="w-6 h-6 stroke-[2]" />
+        <div className="flex items-center gap-2.5 sm:gap-3.5">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-pink-400 border-3 border-black flex items-center justify-center text-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:scale-105 transition-transform duration-200 shrink-0" id="brand-logo">
+            <Coffee className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />
           </div>
           <div>
-            <h1 className="text-2xl md:text-3xl font-retro-heavy text-black tracking-tight leading-none mb-1 drop-shadow-[2px_2px_0px_rgba(255,255,255,1)] uppercase">{businessName || 'Mi Cafetería'}</h1>
-            <div className="flex flex-wrap gap-2 items-center">
-              <p className="text-[11px] font-retro-mono tracking-wider text-black bg-yellow-300 border-2 border-black px-2 py-0.5 inline-block font-black shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)]">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-retro-heavy text-black tracking-tight leading-none mb-1 drop-shadow-[2px_2px_0px_rgba(255,255,255,1)] uppercase">{businessName || 'Mi Cafetería'}</h1>
+            <div className="flex flex-wrap gap-1.5 sm:gap-2 items-center">
+              <p className="text-[9.5px] sm:text-[11px] font-retro-mono tracking-wider text-black bg-yellow-300 border-2 border-black px-1.5 sm:px-2 py-0.5 inline-block font-black shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)]">
                 ARCADE POS v9.0 • ESTILO DE LOS 90
               </p>
-              <p className="text-[11px] font-retro-mono tracking-wider text-black bg-purple-300 border-2 border-black px-2 py-0.5 inline-block font-black shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)]">
+              <p className="text-[9.5px] sm:text-[11px] font-retro-mono tracking-wider text-black bg-purple-300 border-2 border-black px-1.5 sm:px-2 py-0.5 inline-block font-black shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)]">
                 RUC: 1725403883001
               </p>
             </div>

@@ -15,19 +15,27 @@ import {
   AlertTriangle,
   X,
   FileText,
+  Eye,
   Trash2,
-  Ban
+  Ban,
+  Download,
+  Mail,
+  CheckCircle2
 } from 'lucide-react';
-import { Sale, MenuItem, Ingredient, Employee } from '../types';
+import { Sale, MenuItem, Ingredient, Employee, CompanyConfig } from '../types';
 import RetroSelect from './RetroSelect';
 import RetroDatePicker from './RetroDatePicker';
 import { formatNum } from '../utils';
+import { exportSaleRidePdf, exportNotaVentaPdf, saleToElectronicInvoice } from '../utils/sriPdfGenerator';
+import { sendSaleComprobanteEmail } from '../utils/emailService';
+import RidePreviewModal from './RidePreviewModal';
 
 interface SalesViewProps {
   sales: Sale[];
   menuItems: MenuItem[];
   ingredients: Ingredient[];
   employees: Employee[];
+  company?: CompanyConfig;
   onVoidSale: (saleId: string) => void;
   onDeleteSale: (saleId: string) => void;
 }
@@ -37,10 +45,12 @@ export default function SalesView({
   menuItems,
   ingredients,
   employees,
+  company,
   onVoidSale,
   onDeleteSale
 }: SalesViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterDocType, setFilterDocType] = useState<string>('all');
   const [filterPayment, setFilterPayment] = useState<string>('all');
   const [filterEmployee, setFilterEmployee] = useState<string>('all');
   const [filterPeriod, setFilterPeriod] = useState<'today' | '7d' | '30d' | 'custom' | 'all'>('all');
@@ -48,14 +58,25 @@ export default function SalesView({
   const [endDate, setEndDate] = useState('');
   
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
+  const [previewRideSale, setPreviewRideSale] = useState<Sale | null>(null);
   const [confirmVoidId, setConfirmVoidId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [saleEmailInput, setSaleEmailInput] = useState('');
+  const [isSendingSaleEmail, setIsSendingSaleEmail] = useState(false);
+  const [saleEmailFeedback, setSaleEmailFeedback] = useState<{ success: boolean; message: string } | null>(null);
+
+  React.useEffect(() => {
+    if (selectedSale) {
+      setSaleEmailInput(selectedSale.customer?.email || '');
+      setSaleEmailFeedback(null);
+    }
+  }, [selectedSale]);
 
   const [currentPage, setCurrentPage] = useState(1);
 
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, filterPayment, filterEmployee, filterPeriod, startDate, endDate]);
+  }, [searchQuery, filterDocType, filterPayment, filterEmployee, filterPeriod, startDate, endDate]);
 
   // Helper to detect ingredient shortages for current menuItems
   const hasIngredientShortage = (item: MenuItem): boolean => {
@@ -126,6 +147,10 @@ export default function SalesView({
       (sale.customer && sale.customer.documentId.toLowerCase().includes(searchQuery.toLowerCase())) ||
       sale.employeeName.toLowerCase().includes(searchQuery.toLowerCase());
 
+    // Document type match
+    const matchesDocType = filterDocType === 'all' ||
+      (filterDocType === 'factura' ? sale.documentType === 'factura' : sale.documentType !== 'factura');
+
     // Payment method match
     const matchesPayment = filterPayment === 'all' || sale.paymentMethod === filterPayment;
 
@@ -135,7 +160,7 @@ export default function SalesView({
     // Date/period match
     const matchesDate = checkWithinPeriod(sale.timestamp);
 
-    return matchesSearch && matchesPayment && matchesEmployee && matchesDate;
+    return matchesSearch && matchesDocType && matchesPayment && matchesEmployee && matchesDate;
   });
 
   const isPrintingRef = React.useRef(false);
@@ -158,18 +183,18 @@ export default function SalesView({
           <div>
             <h2 className="font-retro-heavy text-base uppercase text-black flex items-center gap-2">
               <Receipt className="w-5 h-5 stroke-[2.5]" />
-              🧾 REGISTRO DE NOTAS DE VENTA
+              🧾 REGISTRO DE COMPROBANTES DE VENTA
             </h2>
-            <p className="text-xs font-bold text-zinc-600 mt-0.5 uppercase">Búsqueda, visualización y reimpresión de comprobantes</p>
+            <p className="text-xs font-bold text-zinc-600 mt-0.5 uppercase">Búsqueda, visualización y reimpresión de comprobantes (Notas de Venta y Facturas)</p>
           </div>
           <div className="text-right text-xs font-black uppercase text-black bg-yellow-100 border-2 border-black px-3 py-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-            Total notas: {filteredSales.length}
+            Total comprobantes: {filteredSales.length}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3.5">
           {/* Search bar */}
-          <div className="lg:col-span-4 space-y-1">
+          <div className="lg:col-span-3 space-y-1">
             <label className="block text-[11px] font-black uppercase tracking-wider text-black">Buscar</label>
             <div className="relative">
               <Search className="absolute left-3 top-2.5 w-4 h-4 text-black stroke-[2.5]" />
@@ -177,10 +202,25 @@ export default function SalesView({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Nº factura, cliente o cajero..."
+                placeholder="Nº, cliente o cajero..."
                 className="w-full pl-9 pr-3 py-2 border-3 border-black bg-pink-50 rounded-lg text-xs font-extrabold text-black focus:outline-none focus:bg-white placeholder-zinc-500"
               />
             </div>
+          </div>
+
+          {/* Document type */}
+          <div className="lg:col-span-2 space-y-1">
+            <label className="block text-[11px] font-black uppercase tracking-wider text-black">Comprobante</label>
+            <RetroSelect
+              value={filterDocType}
+              onChange={setFilterDocType}
+              dense
+              options={[
+                { value: 'all', label: 'TODOS' },
+                { value: 'nota_venta', label: 'NOTAS VENTA' },
+                { value: 'factura', label: 'FACTURAS' },
+              ]}
+            />
           </div>
 
           {/* Payment method */}
@@ -200,7 +240,7 @@ export default function SalesView({
           </div>
 
           {/* Employee */}
-          <div className="lg:col-span-3 space-y-1">
+          <div className="lg:col-span-2 space-y-1">
             <label className="block text-[11px] font-black uppercase tracking-wider text-black">Cajero</label>
             <RetroSelect
               value={filterEmployee}
@@ -267,7 +307,7 @@ export default function SalesView({
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-yellow-50 border-b-3 border-black text-[10px] font-black uppercase tracking-wider text-black">
-                    <th className="p-3">Factura</th>
+                    <th className="p-3">Comprobante</th>
                     <th className="p-3">Fecha y Hora</th>
                     <th className="p-3">Cliente</th>
                     <th className="p-3">Cajero</th>
@@ -299,13 +339,22 @@ export default function SalesView({
                               } ${isVoided ? 'opacity-65 bg-red-50/20' : ''}`}
                             >
                               <td className="p-3">
-                                <span className={`font-retro-mono border px-1.5 py-0.5 rounded ${
-                                  isVoided 
-                                    ? 'bg-red-100 border-red-400 text-red-700 line-through' 
-                                    : 'bg-zinc-100 border-black text-black'
-                                }`}>
-                                  {sale.invoiceNumber || sale.id.substring(0, 8).toUpperCase()}
-                                </span>
+                                <div className="flex flex-col gap-0.5 items-start">
+                                  <span className={`font-retro-mono border px-1.5 py-0.5 rounded text-[11px] font-black ${
+                                    isVoided 
+                                      ? 'bg-red-100 border-red-400 text-red-700 line-through' 
+                                      : 'bg-zinc-100 border-black text-black'
+                                  }`}>
+                                    {sale.invoiceNumber || sale.id.substring(0, 8).toUpperCase()}
+                                  </span>
+                                  <span className={`text-[8.5px] font-black uppercase px-1 py-0.2 rounded border ${
+                                    sale.documentType === 'factura' 
+                                      ? 'bg-cyan-200 border-cyan-800 text-cyan-950' 
+                                      : 'bg-yellow-200 border-yellow-800 text-yellow-950'
+                                  }`}>
+                                    {sale.documentType === 'factura' ? '🧾 Factura' : '📄 Nota Venta'}
+                                  </span>
+                                </div>
                               </td>
                               <td className="p-3">
                                 {new Date(sale.timestamp).toLocaleString('es-ES', { 
@@ -352,9 +401,27 @@ export default function SalesView({
                                 </div>
                               </td>
                               <td className="p-3 text-center">
-                                <button className="bg-white hover:bg-zinc-100 border-2 border-black rounded p-1 shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5">
-                                  <ChevronRight className="w-3.5 h-3.5 text-black" />
-                                </button>
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPreviewRideSale(sale);
+                                    }}
+                                    title="Visualizar RIDE en Modal"
+                                    className="bg-pink-300 hover:bg-pink-400 border-2 border-black rounded px-1.5 py-0.5 text-[9px] font-black uppercase text-black flex items-center gap-1 shadow-[1px_1px_0px_0px_#000] active:translate-y-0.5 cursor-pointer"
+                                  >
+                                    <Eye className="w-3 h-3 stroke-[2.5]" />
+                                    RIDE
+                                  </button>
+                                  <button
+                                    onClick={() => setSelectedSale(sale)}
+                                    className="bg-white hover:bg-zinc-100 border-2 border-black rounded p-1 shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 cursor-pointer"
+                                    title="Ver detalle"
+                                  >
+                                    <ChevronRight className="w-3.5 h-3.5 text-black" />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );
@@ -451,22 +518,41 @@ export default function SalesView({
               {/* Printable Area Wrapper */}
               <div className="p-5 bg-zinc-50 border-b-4 border-black">
                 <div 
-                  className="bg-white border-3 border-black p-5 font-retro-mono text-xs text-black leading-relaxed space-y-4 max-h-[440px] overflow-y-auto shadow-inner printable-ticket"
+                  className={`bg-white border-3 border-black p-5 font-retro-mono text-xs text-black leading-relaxed space-y-4 max-h-[440px] overflow-y-auto shadow-inner ${!previewRideSale ? 'printable-ticket' : ''}`}
                   id="sales-ticket-print-area"
                 >
                   {/* Ticket Header */}
                   <div className="text-center space-y-1.5 border-b-2 border-dashed border-black/40 pb-4">
-                    <h4 className="font-retro-heavy text-base uppercase tracking-tight">MOCCAPRICHO</h4>
-                    <p className="text-[10px] font-bold">RUC: 1725403883001</p>
-                    <p className="text-[10px] font-semibold leading-snug uppercase">GUAMANÍ - VICTORIA CENTRAL / PEDRO VICENTE MALDONADO ESQ S59D / S59-190 / S59D</p>
+                    <h4 className="font-retro-heavy text-base uppercase tracking-tight">
+                      {company?.nombreComercial || company?.razonSocial || 'MOCCAPRICHO'}
+                    </h4>
+                    <p className="text-[10px] font-bold">RUC: {company?.ruc || '1725403883001'}</p>
+                    <p className="text-[10px] font-semibold leading-snug uppercase">
+                      {company?.dirEstablecimiento || company?.dirMatriz || 'GUAMANÍ - VICTORIA CENTRAL / PEDRO VICENTE MALDONADO ESQ S59D / S59-190 / S59D'}
+                    </p>
+                    <div className="py-1">
+                      <p className="text-[9px] text-black font-black uppercase tracking-wider border-y-2 border-dashed border-black/40 py-1">
+                        {selectedSale.documentType === 'factura' ? '*** FACTURA ELECTRÓNICA ***' : '*** NOTA DE VENTA ***'}
+                      </p>
+                    </div>
                     
                     <div className="pt-2 text-[10px] text-left space-y-1 font-bold">
                       <div className="flex justify-between">
-                        <span>Nº NOTA:</span>
-                        <span className="font-black bg-yellow-100 border border-black px-1 rounded">
+                        <span>{selectedSale.documentType === 'factura' ? 'Nº FACTURA:' : 'Nº NOTA:'}</span>
+                        <span className={`font-black border border-black px-1 rounded ${
+                          selectedSale.documentType === 'factura' ? 'bg-cyan-100' : 'bg-yellow-100'
+                        }`}>
                           {selectedSale.invoiceNumber || selectedSale.id}
                         </span>
                       </div>
+                      {selectedSale.accessKey && (
+                        <div className="text-[9px] space-y-0.5 pt-0.5">
+                          <span className="text-zinc-600">CLAVE DE ACCESO:</span>
+                          <p className="font-retro-mono text-[8px] break-all bg-zinc-50 border border-zinc-300 p-1 rounded font-bold">
+                            {selectedSale.accessKey}
+                          </p>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <span>FECHA:</span>
                         <span>{new Date(selectedSale.timestamp).toLocaleString('es-ES')}</span>
@@ -569,37 +655,47 @@ export default function SalesView({
                   </div>
 
                   {/* Calculations */}
-                  <div className="space-y-1 text-right text-[10px] text-black font-bold">
-                    <div className="flex justify-between">
-                      <span>SUBTOTAL (SIN IVA):</span>
-                      <span>${formatNum(selectedSale.total)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>IVA (0%):</span>
-                      <span>$0.00</span>
-                    </div>
-                    <div className="flex justify-between text-xs font-black border-t border-black pt-1">
-                      <span>TOTAL A PAGAR:</span>
-                      <span>${formatNum(selectedSale.total)} USD</span>
-                    </div>
-                    {selectedSale.paymentMethod === 'efectivo' && (
-                      <div className="pt-2 text-[10px] border-t border-dashed border-black/20 space-y-1">
-                        <div className="flex justify-between text-zinc-600">
-                          <span>EFECTIVO ENTREGADO:</span>
-                          <span>${formatNum(selectedSale.cashReceived || 0)} USD</span>
+                  {(() => {
+                    const invCalc = saleToElectronicInvoice(selectedSale, company);
+                    const ratePct = selectedSale.taxRate && selectedSale.taxRate > 0 ? Math.round(selectedSale.taxRate * 100) : 15;
+                    return (
+                      <div className="space-y-1 text-right text-[10px] text-black font-bold">
+                        <div className="flex justify-between">
+                          <span>SUBTOTAL (SIN IVA):</span>
+                          <span>${formatNum(invCalc.subtotalSinImpuestos)}</span>
                         </div>
-                        <div className="flex justify-between text-emerald-700 font-extrabold">
-                          <span>CAMBIO ENTREGADO:</span>
-                          <span>${formatNum(selectedSale.changeGiven || 0)} USD</span>
+                        <div className="flex justify-between">
+                          <span>IVA ({ratePct}% DESGLOSADO):</span>
+                          <span>${formatNum(invCalc.totalIva)}</span>
                         </div>
+                        <div className="flex justify-between text-xs font-black border-t border-black pt-1">
+                          <span>TOTAL A PAGAR:</span>
+                          <span>${formatNum(selectedSale.total)} USD</span>
+                        </div>
+                        {selectedSale.paymentMethod === 'efectivo' && (
+                          <div className="pt-2 text-[10px] border-t border-dashed border-black/20 space-y-1">
+                            <div className="flex justify-between text-zinc-600">
+                              <span>EFECTIVO ENTREGADO:</span>
+                              <span>${formatNum(selectedSale.cashReceived || 0)} USD</span>
+                            </div>
+                            <div className="flex justify-between text-emerald-700 font-extrabold">
+                              <span>CAMBIO ENTREGADO:</span>
+                              <span>${formatNum(selectedSale.changeGiven || 0)} USD</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    );
+                  })()}
 
                   {/* Ticket Footer */}
                   <div className="text-center pt-4 border-t-2 border-dashed border-black/40 text-[9px] font-bold space-y-1">
                     <p className="uppercase font-extrabold">¡GRACIAS POR TU VISITA!</p>
-                    <p className="uppercase">DOCUMENTO SIN VALIDEZ TRIBUTARIA</p>
+                    <p className="uppercase">
+                      {selectedSale.documentType === 'factura'
+                        ? 'FACTURA ELECTRÓNICA AUTORIZADA POR EL SRI'
+                        : 'COMPROBANTE NOTA DE VENTA'}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -608,28 +704,62 @@ export default function SalesView({
               <div className="bg-pink-100 p-4 border-t-3 border-black flex flex-wrap gap-3 justify-between items-center">
                 {/* Left side: Void and Delete actions */}
                 <div className="flex flex-wrap gap-2.5 items-center">
-                  {selectedSale.status !== 'voided' ? (
-                    confirmVoidId === selectedSale.id ? (
-                      <div className="flex items-center gap-1.5 bg-yellow-100 border-2 border-black p-1 rounded-lg shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)]">
-                        <span className="text-[9px] font-black uppercase text-black px-1">¿ANULAR NOTA?</span>
-                        <button
-                          onClick={() => {
-                            onVoidSale(selectedSale.id);
-                            setSelectedSale({ ...selectedSale, status: 'voided' });
-                            setConfirmVoidId(null);
-                          }}
-                          className="bg-red-500 hover:bg-red-600 text-white border-2 border-black rounded px-2 py-0.5 text-[9px] font-black uppercase cursor-pointer transition-colors"
+                  {(() => {
+                    const docId = (selectedSale.customer?.documentId || '').trim();
+                    const custName = (selectedSale.customer?.name || '').trim().toUpperCase();
+                    const isCf =
+                      !docId ||
+                      docId === '9999999999999' ||
+                      docId === '9999999999' ||
+                      /^9+$/.test(docId) ||
+                      custName.includes('CONSUMIDOR FINAL');
+                    const isFacturaCf = selectedSale.documentType === 'factura' && isCf;
+
+                    if (selectedSale.status === 'voided') {
+                      return (
+                        <span className="text-[9px] bg-red-100 text-red-700 border border-red-300 font-black px-2.5 py-1.5 rounded uppercase flex items-center gap-1.5 animate-pulse">
+                          <Ban className="w-3.5 h-3.5" /> COMPROBANTE ANULADO (STOCK RESTAURADO)
+                        </span>
+                      );
+                    }
+
+                    if (isFacturaCf) {
+                      return (
+                        <span
+                          className="text-[9.5px] bg-zinc-200 text-zinc-700 border-2 border-black font-black px-2.5 py-2 rounded-lg uppercase flex items-center gap-1.5 cursor-not-allowed"
+                          title="Por normativa del SRI, las facturas emitidas a Consumidor Final NO pueden ser anuladas"
                         >
-                          SÍ, ANULAR
-                        </button>
-                        <button
-                          onClick={() => setConfirmVoidId(null)}
-                          className="bg-zinc-200 hover:bg-zinc-300 text-black border-2 border-black rounded px-2 py-0.5 text-[9px] font-black uppercase cursor-pointer transition-colors"
-                        >
-                          NO
-                        </button>
-                      </div>
-                    ) : (
+                          <Ban className="w-3.5 h-3.5 text-rose-600" />
+                          NO ANULABLE (CONSUMIDOR FINAL SRI)
+                        </span>
+                      );
+                    }
+
+                    if (confirmVoidId === selectedSale.id) {
+                      return (
+                        <div className="flex items-center gap-1.5 bg-yellow-100 border-2 border-black p-1 rounded-lg shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)]">
+                          <span className="text-[9px] font-black uppercase text-black px-1">¿ANULAR COMPROBANTE?</span>
+                          <button
+                            onClick={() => {
+                              onVoidSale(selectedSale.id);
+                              setSelectedSale({ ...selectedSale, status: 'voided' });
+                              setConfirmVoidId(null);
+                            }}
+                            className="bg-red-500 hover:bg-red-600 text-white border-2 border-black rounded px-2 py-0.5 text-[9px] font-black uppercase cursor-pointer transition-colors"
+                          >
+                            SÍ, ANULAR
+                          </button>
+                          <button
+                            onClick={() => setConfirmVoidId(null)}
+                            className="bg-zinc-200 hover:bg-zinc-300 text-black border-2 border-black rounded px-2 py-0.5 text-[9px] font-black uppercase cursor-pointer transition-colors"
+                          >
+                            NO
+                          </button>
+                        </div>
+                      );
+                    }
+
+                    return (
                       <button
                         onClick={() => {
                           setConfirmVoidId(selectedSale.id);
@@ -640,12 +770,8 @@ export default function SalesView({
                         <Ban className="w-4 h-4 stroke-[2.5]" />
                         ANULAR VENTA
                       </button>
-                    )
-                  ) : (
-                    <span className="text-[9px] bg-red-100 text-red-700 border border-red-300 font-black px-2.5 py-1.5 rounded uppercase flex items-center gap-1.5 animate-pulse">
-                      <Ban className="w-3.5 h-3.5" /> NOTA ANULADA (STOCK RESTAURADO)
-                    </span>
-                  )}
+                    );
+                  })()}
 
                   {confirmDeleteId === selectedSale.id ? (
                     <div className="flex items-center gap-1.5 bg-red-50 border-2 border-black p-1 rounded-lg shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)]">
@@ -681,19 +807,130 @@ export default function SalesView({
                   )}
                 </div>
 
-                {/* Right side: Reprint */}
-                <button
-                  onClick={handlePrint}
-                  className="flex items-center gap-2 bg-lime-300 hover:bg-lime-400 text-black border-3 border-black rounded-lg px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-[2.5px_2.5px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-1px] hover:translate-y-[-1px] active:translate-x-[1px] active:translate-y-[1px]"
-                >
-                  <Printer className="w-4 h-4 stroke-[2.5]" />
-                  REIMPRIMIR NOTA
-                </button>
+                {/* Right side: Reprint & RIDE */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const saleToPreview = selectedSale;
+                      setSelectedSale(null);
+                      setPreviewRideSale(saleToPreview);
+                    }}
+                    className="flex items-center gap-2 bg-pink-300 hover:bg-pink-400 text-black border-3 border-black rounded-lg px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-[2.5px_2.5px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-1px] hover:translate-y-[-1px] active:translate-x-[1px] active:translate-y-[1px]"
+                    title="Visualizar Vista Previa RIDE"
+                  >
+                    <Eye className="w-4 h-4 stroke-[2.5]" />
+                    VISTA PREVIA RIDE
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (company) {
+                        if (selectedSale.documentType === 'factura') {
+                          exportSaleRidePdf(selectedSale, company);
+                        } else {
+                          exportNotaVentaPdf(selectedSale, company);
+                        }
+                      }
+                    }}
+                    className="flex items-center gap-2 bg-cyan-300 hover:bg-cyan-400 text-cyan-950 border-3 border-black rounded-lg px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-[2.5px_2.5px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-1px] hover:translate-y-[-1px] active:translate-x-[1px] active:translate-y-[1px]"
+                    title={selectedSale.documentType === 'factura' ? 'Descargar RIDE oficial en formato PDF' : 'Descargar Nota de Venta en formato PDF'}
+                  >
+                    <Download className="w-4 h-4 stroke-[2.5]" />
+                    {selectedSale.documentType === 'factura' ? 'DESCARGAR RIDE (PDF)' : 'PDF NOTA VENTA'}
+                  </button>
+                  <button
+                    onClick={handlePrint}
+                    className="flex items-center gap-2 bg-lime-300 hover:bg-lime-400 text-black border-3 border-black rounded-lg px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-[2.5px_2.5px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-1px] hover:translate-y-[-1px] active:translate-x-[1px] active:translate-y-[1px]"
+                  >
+                    <Printer className="w-4 h-4 stroke-[2.5]" />
+                    {selectedSale.documentType === 'factura' ? 'IMPRIMIR TICKET' : 'REIMPRIMIR NOTA'}
+                  </button>
+                </div>
               </div>
+
+              {/* Barra de envío por correo SMTP (RIDE + XML Autorizado o Nota de Venta PDF) */}
+              {company && (
+                <div className="bg-emerald-100 border-t-3 border-black px-5 py-3 space-y-2 no-print">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <div className="flex items-center gap-1.5 text-[11px] font-black uppercase text-black shrink-0">
+                      <Mail className="w-4 h-4 stroke-[2.5]" />
+                      <span>
+                        {selectedSale.documentType === 'factura'
+                          ? 'Enviar Factura (RIDE PDF + XML Autorizado):'
+                          : 'Enviar Nota de Venta (PDF) al Correo:'}
+                      </span>
+                    </div>
+                    <input
+                      type="email"
+                      placeholder="correo@cliente.com"
+                      value={saleEmailInput}
+                      onChange={(e) => setSaleEmailInput(e.target.value)}
+                      className="flex-1 bg-white border-2 border-black rounded-lg px-3 py-1.5 text-xs font-bold text-black focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      disabled={isSendingSaleEmail}
+                      onClick={async () => {
+                        if (!company) return;
+                        setIsSendingSaleEmail(true);
+                        setSaleEmailFeedback(null);
+                        const res = await sendSaleComprobanteEmail(selectedSale, company, saleEmailInput);
+                        setIsSendingSaleEmail(false);
+                        setSaleEmailFeedback({
+                          success: res.success,
+                          message: res.success
+                            ? res.message || `¡Comprobante enviado a ${saleEmailInput}!`
+                            : res.error || 'Error al enviar correo.',
+                        });
+                      }}
+                      className="bg-emerald-400 hover:bg-emerald-500 text-black border-2 border-black rounded-lg px-4 py-1.5 text-xs font-black uppercase tracking-wider cursor-pointer shadow-[2px_2px_0px_0px_#000] flex items-center justify-center gap-1.5 shrink-0"
+                    >
+                      <Mail className="w-4 h-4 stroke-[2.5]" />
+                      <span>
+                        {isSendingSaleEmail
+                          ? 'ENVIANDO SMTP...'
+                          : selectedSale.documentType === 'factura'
+                          ? 'ENVIAR RIDE + XML'
+                          : 'ENVIAR NOTA DE VENTA'}
+                      </span>
+                    </button>
+                  </div>
+                  {saleEmailFeedback && (
+                    <div
+                      className={`flex items-center gap-1.5 text-[11px] font-black px-2.5 py-1 rounded border border-black ${
+                        saleEmailFeedback.success ? 'bg-lime-300 text-black' : 'bg-rose-200 text-rose-950'
+                      }`}
+                    >
+                      {saleEmailFeedback.success ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-900 shrink-0" />
+                      ) : (
+                        <AlertTriangle className="w-4 h-4 text-rose-800 shrink-0" />
+                      )}
+                      <span>{saleEmailFeedback.message}</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
       </div>
+
+      {/* Modal Vista Previa RIDE */}
+      {previewRideSale && company && (
+        <RidePreviewModal
+          invoice={saleToElectronicInvoice(previewRideSale, company)}
+          company={company}
+          documentLabel={previewRideSale.documentType === 'factura' ? 'FACTURA' : 'NOTA DE VENTA'}
+          onClose={() => setPreviewRideSale(null)}
+          onViewTicket={() => {
+            const saleForTicket = previewRideSale;
+            setPreviewRideSale(null);
+            setSelectedSale(saleForTicket);
+          }}
+        />
+      )}
     </div>
   );
 }

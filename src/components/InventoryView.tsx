@@ -130,6 +130,7 @@ export default function InventoryView({
   const [prodPrice, setProdPrice] = useState('');
   const [prodStock, setProdStock] = useState('');
   const [prodCat, setProdCat] = useState<CategoryType>('reposteria');
+  const [prodIva, setProdIva] = useState<number>(15);
 
   const [ingCurrentPage, setIngCurrentPage] = useState(1);
   const [prodCurrentPage, setProdCurrentPage] = useState(1);
@@ -772,6 +773,7 @@ export default function InventoryView({
     setProdName('');
     setProdPrice('');
     setProdStock('');
+    setProdIva(15);
     // Pre-set category based on subtab
     if (activeSubTab === 'inv_comida') {
       setProdCat('alimentos');
@@ -797,6 +799,7 @@ export default function InventoryView({
     setProdPrice(item.price.toString());
     setProdStock(item.stock !== undefined ? item.stock.toString() : '');
     setProdCat(item.category);
+    setProdIva(item.tarifaIva !== undefined ? item.tarifaIva : 15);
     setRecipeRequirements(item.ingredients || []);
     setSelectedIngredientId('');
     setIngredientQuantityNeeded('');
@@ -839,7 +842,8 @@ export default function InventoryView({
         category: prodCat,
         status: editingProductItem.status,
         ingredients: recipeRequirements,
-        stock
+        stock,
+        tarifaIva: prodIva
       });
 
       // Categorized edit success message
@@ -861,7 +865,8 @@ export default function InventoryView({
         category: prodCat,
         status: 'active',
         ingredients: recipeRequirements,
-        stock
+        stock,
+        tarifaIva: prodIva
       });
 
       // Categorized create success message
@@ -883,6 +888,7 @@ export default function InventoryView({
     setProdName('');
     setProdPrice('');
     setProdStock('');
+    setProdIva(15);
     setRecipeRequirements([]);
     setSelectedIngredientId('');
     setIngredientQuantityNeeded('');
@@ -1778,7 +1784,7 @@ export default function InventoryView({
                   </div>
 
                   <div>
-                    <label className="block font-black uppercase mb-1">Precio Venta (USD)</label>
+                    <label className="block font-black uppercase mb-1">Precio Venta PVP (USD)</label>
                     <input
                       type="number"
                       step="0.01"
@@ -1789,6 +1795,23 @@ export default function InventoryView({
                       className="w-full border-3 border-black bg-pink-50 rounded-lg p-2.5 focus:outline-none focus:bg-white font-retro-mono font-black text-black"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block font-black uppercase mb-1">Tarifa IVA</label>
+                  <select
+                    value={prodIva}
+                    onChange={(e) => setProdIva(Number(e.target.value))}
+                    className="w-full border-3 border-black bg-cyan-50 rounded-lg p-2.5 focus:outline-none focus:bg-white font-bold text-black text-xs cursor-pointer"
+                  >
+                    <option value={15}>15% - IVA Incluido en PVP (Se desglosa)</option>
+                    <option value={0}>0% - Tarifa 0% (Sin IVA)</option>
+                  </select>
+                  {prodIva > 0 && parseNum(prodPrice) > 0 && (
+                    <p className="text-[9.5px] text-cyan-900 font-bold mt-1 bg-cyan-100/70 border border-cyan-300 rounded px-2 py-1">
+                      Desglose PVP ${formatNum(parseNum(prodPrice))}: Base Sin IVA <strong>${formatNum(parseNum(prodPrice) / (1 + prodIva / 100))}</strong> + IVA {prodIva}% <strong>${formatNum(parseNum(prodPrice) - parseNum(prodPrice) / (1 + prodIva / 100))}</strong>
+                    </p>
+                  )}
                 </div>
 
                 {activeSubTab === 'inv_bebidas' && (

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { CustomerDetails } from '../types';
 import { validarDocumentoEcuatoriano } from './POSView';
+import { consultarIdentificacionSri } from '../utils/sriConsultas';
 
 interface CustomersViewProps {
   customers: CustomerDetails[];
@@ -100,125 +101,24 @@ export default function CustomersView({
     setIsLoadedFromDb(false);
     setLoadedSource(null);
     setIsSearchingCedula(true);
+    setSearchCedulaError(null);
     try {
-      const targetUrl = 'https://si.secap.gob.ec/sisecap/logeo_web/json/busca_persona_registro_civil.php';
-      const proxyUrl = 'https://infoplacas.herokuapp.com/';
-
-      let response: Response;
-      try {
-        response = await fetch(targetUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({ documento: cleanCedula, tipo: '1' })
-        });
-      } catch (directErr) {
-        response = await fetch(proxyUrl + targetUrl, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'X-Requested-With': 'XMLHttpRequest'
-          },
-          body: new URLSearchParams({ documento: cleanCedula, tipo: '1' })
-        });
-      }
-
-      if (!response.ok) {
-        response = await fetch(proxyUrl + targetUrl, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'X-Requested-With': 'XMLHttpRequest'
-          },
-          body: new URLSearchParams({ documento: cleanCedula, tipo: '1' })
-        });
-      }
-
-      if (!response.ok) {
-        throw new Error(`Error en servidor: ${response.status}`);
-      }
-
-      const text = await response.text();
-      let data: any;
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        if (text && !text.includes('<html') && text.length < 150) {
-          const name = text.trim();
-          if (name) {
-            setForm(prev => ({ ...prev, name: name.toUpperCase() }));
-            setLoadedSource('rc');
-            setSearchCedulaError(null);
-            return;
-          }
-        }
-        throw new Error('Formato de respuesta inválido');
-      }
-
-      if (data) {
-        const hasRealError = (() => {
-          if (!data.error) return false;
-          if (typeof data.error === 'boolean') return data.error;
-          if (typeof data.error === 'string') {
-            const normalized = data.error.trim().toUpperCase();
-            if (normalized === 'CONSULTA REALIZADA' || normalized === 'OK' || normalized === 'SUCCESS' || normalized === '') {
-              return false;
-            }
-            return true;
-          }
-          return true;
-        })();
-
-        if (hasRealError || data.message === 'No encontrado' || data.error_msg) {
-          throw new Error(data.error || data.message || data.error_msg || 'Cédula no encontrada en Registro Civil');
-        }
-
-        const candidateObject = data.data || data.result || data.persona || data.person || data;
-        const keys = [
-          'nombre', 'nombres', 'nombreCompleto', 'nombre_completo', 'fullName', 
-          'nombres_completos', 'name', 'nombre_completo_registro_civil', 'display_name'
-        ];
-        
-        let foundName = '';
-        for (const key of keys) {
-          if (candidateObject[key] && typeof candidateObject[key] === 'string') {
-            foundName = candidateObject[key];
-            break;
-          }
-        }
-
-        if (!foundName) {
-          const first = candidateObject.nombres || candidateObject.first_name || candidateObject.nombre;
-          const last = candidateObject.apellidos || candidateObject.last_name || candidateObject.apellido;
-          if (first && last) {
-            foundName = `${first} ${last}`;
-          } else if (first) {
-            foundName = String(first);
-          } else if (last) {
-            foundName = String(last);
-          }
-        }
-
-        if (!foundName && typeof candidateObject === 'object') {
-          const stringVals = Object.values(candidateObject).filter(v => typeof v === 'string' && v.length > 3 && !v.includes('{'));
-          if (stringVals.length > 0) {
-            const likelyName = stringVals.find(v => (v as string).split(' ').length >= 2);
-            if (likelyName) {
-              foundName = String(likelyName);
-            }
-          }
-        }
-
-        if (foundName && foundName.trim()) {
-          setForm(prev => ({ ...prev, name: foundName.trim().toUpperCase() }));
-          setLoadedSource('rc');
-          setSearchCedulaError(null);
-        } else {
-          throw new Error('No se pudo extraer el nombre del cliente');
-        }
+      const res = await consultarIdentificacionSri(cleanCedula);
+      if (res.success && res.nombre) {
+        setForm(prev => ({
+          ...prev,
+          name: res.nombre,
+          address: prev.address || res.nombreComercial || '',
+        }));
+        setLoadedSource('rc');
+        setSearchCedulaError(null);
+        setFormError('');
+      } else {
+        setSearchCedulaError(res.error || 'No se encontraron datos registrados en el SRI/Registro Civil');
       }
     } catch (err: any) {
-      console.warn('Consulta Registro Civil falló:', err);
-      setSearchCedulaError(err.message || 'No se pudo consultar el Registro Civil. Ingrese el nombre manualmente.');
+      console.warn('Consulta SRI/Registro Civil falló:', err);
+      setSearchCedulaError(err.message || 'No se pudo consultar el SRI. Ingrese el nombre manualmente.');
     } finally {
       setIsSearchingCedula(false);
     }

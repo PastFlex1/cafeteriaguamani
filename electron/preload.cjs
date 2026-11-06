@@ -6,5 +6,7 @@ contextBridge.exposeInMainWorld('sqliteApi', {
   getDoc: (collection, id) => ipcRenderer.invoke('sqlite:get-doc', collection, id),
   setDoc: (collection, id, data) => ipcRenderer.invoke('sqlite:set-doc', collection, id, data),
   deleteDoc: (collection, id) => ipcRenderer.invoke('sqlite:delete-doc', collection, id),
-  writeBatch: (ops) => ipcRenderer.invoke('sqlite:write-batch', ops)
+  writeBatch: (ops) => ipcRenderer.invoke('sqlite:write-batch', ops),
+  consultarSri: (id) => ipcRenderer.invoke('sri:consultar-identificacion', id),
+  sendEmail: (payload) => ipcRenderer.invoke('smtp:send-email', payload)
 });

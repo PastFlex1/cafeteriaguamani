@@ -19,3 +19,29 @@ export const generateHistoricalSales = (): Sale[] => {
 
 export const initialExpenses: Expense[] = [];
 
+export const defaultCompanyConfig = {
+  ruc: '',
+  razonSocial: 'MOCCAPRICHO CAFETERIA',
+  nombreComercial: 'MOCCAPRICHO',
+  email: '',
+  telefono: '',
+  dirMatriz: 'Quito, Ecuador',
+  dirEstablecimiento: 'Quito, Ecuador',
+  codigoEstablecimiento: '001',
+  puntoEmision: '001',
+  secuencialFactura: 1,
+  secuencialNotaVenta: 1,
+  ambiente: '1' as const,
+  tipoEmision: '1' as const,
+  regimenTributario: 'RIMPE_NEGOCIO_POPULAR' as const,
+  obligadoContabilidad: 'NO' as const,
+  tarifaIvaPredeterminada: 15,
+  smtpHost: 'smtp.gmail.com',
+  smtpPort: 465,
+  smtpSecure: true,
+  smtpUser: '',
+  smtpPass: '',
+  smtpFromName: 'MOCCAPRICHO - Facturación Electrónica',
+  smtpAutoSend: true,
+};
+

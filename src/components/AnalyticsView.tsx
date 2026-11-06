@@ -16,10 +16,14 @@ import {
   CheckCircle,
   Clock,
   Award,
-  Download
+  Download,
+  Receipt,
+  FileText
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
-import { Sale, Expense, Shift } from '../types';
+import { Sale, Expense, Shift, ElectronicInvoice } from '../types';
+import NotasVentaReport from './NotasVentaReport';
+import FacturasReport from './FacturasReport';
 import RetroSelect from './RetroSelect';
 import RetroDatePicker from './RetroDatePicker';
 import { formatNum } from '../utils';
@@ -28,6 +32,7 @@ interface AnalyticsViewProps {
   sales: Sale[];
   expenses: Expense[];
   shifts?: Shift[];
+  invoices?: ElectronicInvoice[];
   onAddExpense: (expense: Omit<Expense, 'id' | 'timestamp'>) => void;
   onRemoveExpense: (expenseId: string) => void;
 }
@@ -36,9 +41,11 @@ export default function AnalyticsView({
   sales,
   expenses,
   shifts = [],
+  invoices = [],
   onAddExpense,
   onRemoveExpense,
 }: AnalyticsViewProps) {
+  const [activeReportTab, setActiveReportTab] = useState<'general' | 'notas_venta' | 'facturas'>('general');
   const [filterPeriod, setFilterPeriod] = useState<'today' | '7d' | '30d' | 'custom' | 'all'>('today');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -94,6 +101,8 @@ export default function AnalyticsView({
   };
 
   const activeSales = sales.filter(s => s.status === 'completed' && checkWithinPeriod(s.timestamp));
+  const periodSales = sales.filter(s => checkWithinPeriod(s.timestamp));
+  const periodInvoices = (invoices || []).filter(inv => checkWithinPeriod(inv.fechaEmision));
   const activeExpenses = expenses.filter(e => checkWithinPeriod(e.timestamp));
   const activeShifts = (shifts || []).filter(s => checkWithinPeriod(s.startTime));
 
@@ -789,20 +798,78 @@ export default function AnalyticsView({
   };
 
   return (
-    <div className="space-y-8" id="analytics-container">
+    <div className="space-y-8" id="analytics-container">      {/* Sub-navigation tabs for Reports */}
+      <div className="flex flex-wrap gap-2 md:gap-3 border-b-4 border-black pb-4 mb-2">
+        <button
+          type="button"
+          onClick={() => setActiveReportTab('general')}
+          className={`flex items-center gap-2 px-4 py-2.5 border-3 border-black rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-1px] hover:translate-y-[-1px] active:translate-y-0.5 ${
+            activeReportTab === 'general'
+              ? 'bg-yellow-300 text-black translate-x-[-1px] translate-y-[-1px] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'
+              : 'bg-white hover:bg-zinc-100 text-black'
+          }`}
+        >
+          <Activity className="w-4 h-4 stroke-[2.5]" />
+          <span>📊 Balance & Ledger Diario</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveReportTab('notas_venta')}
+          className={`flex items-center gap-2 px-4 py-2.5 border-3 border-black rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-1px] hover:translate-y-[-1px] active:translate-y-0.5 ${
+            activeReportTab === 'notas_venta'
+              ? 'bg-fuchsia-300 text-black translate-x-[-1px] translate-y-[-1px] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'
+              : 'bg-white hover:bg-zinc-100 text-black'
+          }`}
+        >
+          <Receipt className="w-4 h-4 stroke-[2.5]" />
+          <span>📜 Reporte Notas de Venta</span>
+          <span className="bg-black text-white px-2 py-0.5 rounded text-[10px] font-retro-mono font-bold">
+            {periodSales.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveReportTab('facturas')}
+          className={`flex items-center gap-2 px-4 py-2.5 border-3 border-black rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-1px] hover:translate-y-[-1px] active:translate-y-0.5 ${
+            activeReportTab === 'facturas'
+              ? 'bg-cyan-300 text-black translate-x-[-1px] translate-y-[-1px] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'
+              : 'bg-white hover:bg-zinc-100 text-black'
+          }`}
+        >
+          <FileText className="w-4 h-4 stroke-[2.5]" />
+          <span>🧾 Reporte Facturas SRI</span>
+          <span className="bg-black text-white px-2 py-0.5 rounded text-[10px] font-retro-mono font-bold">
+            {periodInvoices.length}
+          </span>
+        </button>
+      </div>
+
+
       {/* Header filter options */}
       <div className="bg-white border-4 border-black rounded-xl p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="font-retro-heavy text-base uppercase text-black">📈 MONITOREO DE CAJA Y CONTABILIDAD</h2>
-          <p className="text-xs font-bold text-zinc-600 mt-0.5 uppercase">Auditoría financiera y márgenes netos en tiempo real</p>
-          <button
-            onClick={downloadSalesReportPDF}
-            className="mt-3.5 flex items-center gap-2 bg-black hover:bg-neutral-800 text-white border-2 border-black rounded-lg px-4 py-2 text-xs font-retro-heavy uppercase tracking-wider transition-all cursor-pointer shadow-[2px_2px_0px_0px_rgba(240,240,240,1)] active:translate-y-0.5"
-            title="Descargar reporte completo de ventas y contabilidad en formato PDF"
-          >
-            <Download className="w-4 h-4 stroke-[3]" />
-            DESCARGAR REPORTE (PDF)
-          </button>
+          <h2 className="font-retro-heavy text-base uppercase text-black">
+            {activeReportTab === 'general' && '📈 MONITOREO DE CAJA Y CONTABILIDAD'}
+            {activeReportTab === 'notas_venta' && '📜 AUDITORÍA DE NOTAS DE VENTA'}
+            {activeReportTab === 'facturas' && '🧾 INFORMES FISCALES Y FACTURAS SRI'}
+          </h2>
+          <p className="text-xs font-bold text-zinc-600 mt-0.5 uppercase">
+            {activeReportTab === 'general' && 'Auditoría financiera y márgenes netos en tiempo real'}
+            {activeReportTab === 'notas_venta' && 'Filtro temporal para comprobantes y tickets de venta (POS)'}
+            {activeReportTab === 'facturas' && 'Filtro temporal para comprobantes electrónicos emitidos al SRI'}
+          </p>
+          {activeReportTab === 'general' && (
+            <button
+              onClick={downloadSalesReportPDF}
+              className="mt-3.5 flex items-center gap-2 bg-black hover:bg-neutral-800 text-white border-2 border-black rounded-lg px-4 py-2 text-xs font-retro-heavy uppercase tracking-wider transition-all cursor-pointer shadow-[2px_2px_0px_0px_rgba(240,240,240,1)] active:translate-y-0.5"
+              title="Descargar reporte completo de ventas y contabilidad en formato PDF"
+            >
+              <Download className="w-4 h-4 stroke-[3]" />
+              DESCARGAR REPORTE (PDF)
+            </button>
+          )}
         </div>
 
         <div className="flex flex-col lg:flex-row lg:items-center gap-3">
@@ -838,6 +905,9 @@ export default function AnalyticsView({
           )}
         </div>
       </div>
+      {activeReportTab === 'general' && (
+        <>
+
 
       {/* KPI Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5" id="analytics-kpi-cards">
@@ -1521,12 +1591,20 @@ export default function AnalyticsView({
             })()}
           </div>
           
-          <div className="bg-yellow-100 p-4 text-center border-t-3 border-black text-[10px] text-black font-black tracking-wide uppercase">
-            * Los costos de insumos de cada venta se debitan automáticamente del margen de utilidad total.
+          <div className="bg-yellow-100 p-4 text-center border-t-3 border-black text-[10px] text-black font-black tracking-wide uppercase">* Los costos de insumos de cada venta se debitan automáticamente del margen de utilidad total.
           </div>
         </div>
       </div>
+        </>
+      )}
 
+      {activeReportTab === 'notas_venta' && (
+        <NotasVentaReport sales={periodSales} filterPeriod={filterPeriod} />
+      )}
+
+      {activeReportTab === 'facturas' && (
+        <FacturasReport invoices={periodInvoices} filterPeriod={filterPeriod} />
+      )}
     </div>
   );
 }

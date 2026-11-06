@@ -1281,7 +1281,7 @@ export default function StaffView({
                       { value: 'unbalanced', label: '⚠️ CON DIFERENCIA (SOBRANTE/FALTANTE)' }
                     ]}
                     value={filterStatus}
-                    onChange={setFilterStatus}
+                    onChange={(val) => setFilterStatus(val as any)}
                   />
                 </div>
 
